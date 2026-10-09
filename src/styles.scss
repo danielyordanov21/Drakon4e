@@ -1,1 +1,151 @@
-/* You can add global styles to this file, and also import other style files */
+:root {
+  color-scheme: light;
+  font-family: Inter, "Segoe UI", sans-serif;
+  color: #26352f;
+  background: #f4f7f3;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  --color-ink: #26352f;
+  --color-muted: #718078;
+  --color-brand: #477b5e;
+  --color-brand-dark: #315e45;
+  --color-brand-soft: #e7f0e8;
+  --color-line: #e1e8e1;
+  --color-surface: #fff;
+  --shadow-card: 0 18px 50px rgb(35 57 42 / 8%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  overflow-x: clip;
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-width: 320px;
+  background:
+    radial-gradient(ellipse at 85% 5%, rgb(227 237 223 / 70%), transparent 35rem),
+    #f4f7f3;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: var(--color-brand-dark);
+}
+
+app-calendar-component {
+  display: block;
+  min-width: 0;
+}
+
+app-calendar-component .cal-month-view {
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+app-calendar-component .cal-month-view .cal-header {
+  background: #f5f8f4;
+  color: var(--color-muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+app-calendar-component .cal-month-view .cal-days {
+  border-color: var(--color-line);
+}
+
+app-calendar-component .cal-month-view .cal-day-cell,
+app-calendar-component .cal-month-view .cal-day-cell:not(:last-child) {
+  border-color: var(--color-line);
+}
+
+app-calendar-component .cal-month-view .cal-day-cell {
+  min-height: clamp(48px, 8vw, 86px);
+}
+
+app-calendar-component .cal-month-view .cal-day-number {
+  margin: 8px 8px 5px 0;
+  color: var(--color-muted);
+  font-size: 0.8rem;
+}
+
+app-calendar-component .cal-month-view .cal-day-cell.cal-today {
+  background: #f1f7ef;
+}
+
+app-calendar-component .cal-month-view .cal-day-cell.cal-today .cal-day-number {
+  color: var(--color-brand-dark);
+  font-weight: 700;
+  opacity: 1;
+}
+
+app-calendar-component .cal-month-view .cal-cell-row:hover {
+  background: #fafcf9;
+}
+
+app-calendar-component .cal-month-view .cal-cell-row .cal-cell:hover,
+app-calendar-component .cal-month-view .cal-cell.cal-has-events.cal-open {
+  background: #edf4ed;
+}
+
+app-calendar-component .cal-month-view .cal-open-day-events {
+  background: #f1f7ef;
+  color: var(--color-ink);
+}
+
+.modal-content {
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.modal-header,
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+}
+
+.modal-header {
+  border-bottom: 1px solid var(--color-line);
+}
+
+.modal-footer {
+  justify-content: flex-end;
+  border-top: 1px solid var(--color-line);
+}
+
+.modal-body {
+  padding: 1.25rem;
+}
+
+@media (max-width: 640px) {
+  app-calendar-component .cal-month-view .cal-day-cell {
+    min-height: 44px;
+  }
+}
