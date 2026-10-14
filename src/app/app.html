@@ -1,1 +1,31 @@
-<router-outlet />
+@if (demoMode) {
+  <main class="app-shell">
+    <aside class="app-demo-notice" role="status">
+      Demo mode — sample data only; changes are temporary and aren’t saved to Supabase.
+    </aside>
+    <router-outlet />
+  </main>
+} @else if (!auth.ready()) {
+  <main class="app-status" role="status">Connecting to Supabase…</main>
+} @else if (auth.initializationError(); as error) {
+  <main class="app-status app-status--error" role="alert">
+    <h1>Could not connect to Supabase</h1>
+    <p>{{ error }}</p>
+    <p>Check the project URL, publishable key, and network connection.</p>
+  </main>
+} @else if (auth.session()) {
+  <main class="app-shell">
+    <header class="app-session">
+      <span>Signed in{{ auth.session()?.user?.email ? ' as ' + auth.session()?.user?.email : '' }}</span>
+      <button type="button" (click)="signOut()" [disabled]="signingOut()">
+        {{ signingOut() ? 'Signing out…' : 'Sign out' }}
+      </button>
+    </header>
+    @if (signOutError(); as error) {
+      <p class="app-status app-status--error" role="alert">{{ error }}</p>
+    }
+    <router-outlet />
+  </main>
+} @else {
+  <app-authentication-component />
+}

@@ -8,7 +8,7 @@
           mwlCalendarPreviousView
           [view]="view"
           [(viewDate)]="viewDate"
-          (viewDateChange)="closeOpenMonthViewDay()"
+          (viewDateChange)="onViewDateChange()"
           aria-label="Previous period"
         >
           <span aria-hidden="true">&lsaquo;</span>
@@ -18,6 +18,7 @@
           class="calendar-button calendar-button--today"
           mwlCalendarToday
           [(viewDate)]="viewDate"
+          (viewDateChange)="onViewDateChange()"
         >
           Today
         </button>
@@ -27,7 +28,7 @@
           mwlCalendarNextView
           [view]="view"
           [(viewDate)]="viewDate"
-          (viewDateChange)="closeOpenMonthViewDay()"
+          (viewDateChange)="onViewDateChange()"
           aria-label="Next period"
         >
           <span aria-hidden="true">&rsaquo;</span>
@@ -39,66 +40,73 @@
       </h3>
     </div>
 
-    <div class="calendar-view-switch" aria-label="Calendar view">
-      <button
-        type="button"
-        class="calendar-button"
-        (click)="setView(CalendarView.Month)"
-        [class.is-active]="view === CalendarView.Month"
-        [attr.aria-pressed]="view === CalendarView.Month"
-      >
-        Month
-      </button>
-      <button
-        type="button"
-        class="calendar-button"
-        (click)="setView(CalendarView.Week)"
-        [class.is-active]="view === CalendarView.Week"
-        [attr.aria-pressed]="view === CalendarView.Week"
-      >
-        Week
-      </button>
-      <button
-        type="button"
-        class="calendar-button"
-        (click)="setView(CalendarView.Day)"
-        [class.is-active]="view === CalendarView.Day"
-        [attr.aria-pressed]="view === CalendarView.Day"
-      >
-        Day
-      </button>
+    <div class="calendar-toolbar-actions">
+      <app-person-button-component />
+      <div class="calendar-view-switch" aria-label="Calendar view">
+        <button
+          type="button"
+          class="calendar-button"
+          (click)="setView(CalendarView.Month)"
+          [class.is-active]="view === CalendarView.Month"
+          [attr.aria-pressed]="view === CalendarView.Month"
+        >
+          Month
+        </button>
+        <button
+          type="button"
+          class="calendar-button"
+          (click)="setView(CalendarView.Week)"
+          [class.is-active]="view === CalendarView.Week"
+          [attr.aria-pressed]="view === CalendarView.Week"
+        >
+          Week
+        </button>
+        <button
+          type="button"
+          class="calendar-button"
+          (click)="setView(CalendarView.Day)"
+          [class.is-active]="view === CalendarView.Day"
+          [attr.aria-pressed]="view === CalendarView.Day"
+        >
+          Day
+        </button>
+      </div>
     </div>
   </header>
+
+  @if (loading()) {
+    <p class="calendar-status" role="status">Loading events…</p>
+  }
+  @if (errorMessage(); as error) {
+    <p class="calendar-error" role="alert">{{ error }}</p>
+  }
 
   <div class="calendar-grid">
     @switch (view) {
       @case (CalendarView.Month) {
         <mwl-calendar-month-view
           [viewDate]="viewDate"
-          [events]="events"
+          [events]="events()"
           [refresh]="refresh"
           [activeDayIsOpen]="activeDayIsOpen"
           (dayClicked)="dayClicked($event.day)"
-          (eventClicked)="handleEvent('Clicked', $event.event)"
-          (eventTimesChanged)="eventTimesChanged($event)"
+          (eventClicked)="handleCalendarEvent($event.event)"
         />
       }
       @case (CalendarView.Week) {
         <mwl-calendar-week-view
           [viewDate]="viewDate"
-          [events]="events"
+          [events]="events()"
           [refresh]="refresh"
-          (eventClicked)="handleEvent('Clicked', $event.event)"
-          (eventTimesChanged)="eventTimesChanged($event)"
+          (eventClicked)="handleCalendarEvent($event.event)"
         />
       }
       @case (CalendarView.Day) {
         <mwl-calendar-day-view
           [viewDate]="viewDate"
-          [events]="events"
+          [events]="events()"
           [refresh]="refresh"
-          (eventClicked)="handleEvent('Clicked', $event.event)"
-          (eventTimesChanged)="eventTimesChanged($event)"
+          (eventClicked)="handleCalendarEvent($event.event)"
         />
       }
     }
@@ -110,9 +118,16 @@
         <p class="events-panel__eyebrow">Your schedule</p>
         <h3 id="events-heading">Events</h3>
       </div>
-      <button type="button" class="calendar-button calendar-button--primary" (click)="addEvent()">
-        Add event
-      </button>
+      @if (hasMore()) {
+        <button
+          type="button"
+          class="calendar-button calendar-button--primary"
+          (click)="loadMore()"
+          [disabled]="loading()"
+        >
+          Load more
+        </button>
+      }
     </header>
 
     <div class="events-table-wrap">
@@ -120,87 +135,33 @@
         <thead>
           <tr>
             <th scope="col">Event</th>
-            <th scope="col">Color</th>
             <th scope="col">Starts</th>
             <th scope="col">Ends</th>
-            <th scope="col">Actions</th>
           </tr>
         </thead>
         <tbody>
-          @for (event of events; track event) {
+          @for (event of events(); track event.id) {
             <tr>
               <td>
-                <input
-                  class="event-input event-input--title"
-                  type="text"
-                  aria-label="Event title"
-                  [(ngModel)]="event.title"
-                  (keyup)="refresh.next()"
-                />
-              </td>
-              <td>
-                <div class="event-colors">
-                  <input
-                    class="event-color"
-                    type="color"
-                    aria-label="Event primary color"
-                    [(ngModel)]="event.color!.primary"
-                    (change)="refresh.next()"
-                  />
-                  <input
-                    class="event-color"
-                    type="color"
-                    aria-label="Event secondary color"
-                    [(ngModel)]="event.color!.secondary"
-                    (change)="refresh.next()"
-                  />
-                </div>
-              </td>
-              <td>
-                <input
-                  class="event-input"
-                  type="text"
-                  mwlFlatpickr
-                  [(ngModel)]="event.start"
-                  (ngModelChange)="refresh.next()"
-                  [altInput]="true"
-                  [convertModelValue]="true"
-                  [enableTime]="true"
-                  dateFormat="Y-m-dTH:i"
-                  altFormat="F j, Y H:i"
-                  placeholder="Not set"
-                  aria-label="Event start"
-                />
-              </td>
-              <td>
-                <input
-                  class="event-input"
-                  type="text"
-                  mwlFlatpickr
-                  [(ngModel)]="event.end"
-                  (ngModelChange)="refresh.next()"
-                  [altInput]="true"
-                  [convertModelValue]="true"
-                  [enableTime]="true"
-                  dateFormat="Y-m-dTH:i"
-                  altFormat="F j, Y H:i"
-                  placeholder="Not set"
-                  aria-label="Event end"
-                />
-              </td>
-              <td class="events-table__actions">
                 <button
                   type="button"
-                  class="calendar-button calendar-button--danger"
-                  (click)="deleteEvent(event)"
+                  class="event-details-button"
+                  (click)="handleEvent(event)"
+                  [attr.aria-label]="'Show participants for ' + event.title"
                 >
-                  Remove
+                  {{ event.title }}
                 </button>
               </td>
+              <td>{{ event.start | date:'medium' }}</td>
+              <td>{{ event.end ? (event.end | date:'medium') : '—' }}</td>
             </tr>
           } @empty {
             <tr>
-              <td class="events-empty" colspan="5">No events yet. Add one to get started.</td>
+              <td class="events-empty" colspan="3">
+                @if (!loading() && !errorMessage()) {
+                  No events in this date range.
+                }
+              </td>
             </tr>
           }
         </tbody>
@@ -211,14 +172,37 @@
 
 <ng-template #modalContent let-close="close">
   <div class="modal-header">
-    <h5 class="modal-title">Event updated</h5>
+    <h5 class="modal-title">{{ modalEvent?.title }}</h5>
     <button type="button" class="calendar-button" (click)="close()" aria-label="Close dialog">
       Close
     </button>
   </div>
   <div class="modal-body">
-    <p>{{ modalData?.action }} this event.</p>
-    <pre>{{ modalData?.event | json }}</pre>
+    <h6>Participants</h6>
+    @if (participantsLoading()) {
+      <p class="calendar-status" role="status">Loading participants…</p>
+    } @else if (participantsError(); as error) {
+      <p class="calendar-error" role="alert">{{ error }}</p>
+    } @else {
+      <ul class="participant-list">
+        @for (participant of participants(); track participant.id) {
+          <li>
+            <span>{{ participant.name }}</span>
+            @if (participant.id === personId()) {
+              <button
+                type="button"
+                class="calendar-button calendar-button--danger"
+                (click)="removeParticipant(participant)"
+              >
+                Remove from event
+              </button>
+            }
+          </li>
+        } @empty {
+          <li>No participants.</li>
+        }
+      </ul>
+    }
   </div>
   <div class="modal-footer">
     <button type="button" class="calendar-button calendar-button--primary" (click)="close()">

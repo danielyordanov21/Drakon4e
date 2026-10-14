@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import {FormControl, FormGroup, FormsModule, ReactiveFormsModule} from '@angular/forms';
+import { FormControl, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatListModule } from '@angular/material/list';
 
 @Component({
@@ -14,5 +14,5 @@ import { MatListModule } from '@angular/material/list';
   styleUrl: './list-component.scss',
 })
 export class ListComponent {
-  
+
 }

@@ -1,13 +1,12 @@
 import { Routes } from '@angular/router';
 
-import { MenuComponent } from './components/menu-component/menu-component';
 import { CalendarComponent } from './components/calendar-component/calendar-component';
 import { PersonComponent } from './components/person-component/person-component';
 
 export const routes: Routes = [
   {
     path: '',
-    component: MenuComponent,
+    component: CalendarComponent,
   },
   {
     path: 'calendar',

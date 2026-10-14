@@ -1,0 +1,53 @@
+<main class="auth-page">
+  <section class="auth-card" aria-labelledby="auth-heading">
+    <p class="auth-eyebrow">Drakon4e calendar</p>
+    <h1 id="auth-heading">{{ isSignUp() ? 'Create your account' : 'Welcome back' }}</h1>
+    <p class="auth-intro">
+      {{ isSignUp() ? 'Create an account to access the shared calendar.' : 'Sign in to access the shared calendar.' }}
+    </p>
+
+    <form (ngSubmit)="submit()">
+      <label for="auth-email">Email</label>
+      <input
+        id="auth-email"
+        name="email"
+        type="email"
+        autocomplete="email"
+        [(ngModel)]="email"
+        required
+      />
+
+      <label for="auth-password">Password</label>
+      <input
+        id="auth-password"
+        name="password"
+        type="password"
+        [autocomplete]="isSignUp() ? 'new-password' : 'current-password'"
+        [(ngModel)]="password"
+        required
+      />
+
+      @if (errorMessage(); as error) {
+        <p class="auth-message auth-message--error" role="alert">{{ error }}</p>
+      }
+      @if (successMessage(); as message) {
+        <p class="auth-message auth-message--success" role="status">{{ message }}</p>
+      }
+
+      <button class="auth-submit" type="submit" [disabled]="submitting()">
+        @if (submitting()) {
+          Please wait…
+        } @else {
+          {{ isSignUp() ? 'Create account' : 'Sign in' }}
+        }
+      </button>
+    </form>
+
+    <p class="auth-switch">
+      {{ isSignUp() ? 'Already have an account?' : 'New to the calendar?' }}
+      <button type="button" (click)="toggleMode()">
+        {{ isSignUp() ? 'Sign in' : 'Create an account' }}
+      </button>
+    </p>
+  </section>
+</main>

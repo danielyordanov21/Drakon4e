@@ -1,0 +1,86 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.person-picker {
+  position: relative;
+}
+
+.person-picker__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 42px;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.person-picker__trigger:hover,
+.person-picker__option:hover {
+  background: #eaf1e9;
+  color: var(--color-brand-dark);
+}
+
+.person-picker__trigger:focus-visible,
+.person-picker__option:focus-visible {
+  outline: 3px solid rgb(71 123 94 / 28%);
+  outline-offset: 2px;
+}
+
+.person-picker__chevron {
+  color: var(--color-brand-dark);
+  font-size: 1.1rem;
+  line-height: 0.8;
+}
+
+.person-picker__dropdown {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  display: grid;
+  gap: 0.4rem;
+  width: min(18rem, 80vw);
+  max-height: min(24rem, 60vh);
+  padding: 0.5rem;
+  overflow-y: auto;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-surface);
+  box-shadow: 0 12px 30px rgb(25 45 32 / 16%);
+}
+
+.person-picker__option {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: #f8faf7;
+  color: var(--color-ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.person-picker__status,
+.person-picker__error {
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  color: var(--color-muted);
+  font-size: 0.82rem;
+}
+
+.person-picker__error {
+  color: #8f332b;
+}

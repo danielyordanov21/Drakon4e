@@ -27,6 +27,12 @@
   min-width: 0;
 }
 
+.calendar-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .calendar-month-nav,
 .calendar-view-switch {
   display: inline-flex;
@@ -119,6 +125,20 @@
   min-width: 0;
 }
 
+.calendar-status,
+.calendar-error {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 9px;
+  background: #f3f6f2;
+  color: var(--color-muted);
+}
+
+.calendar-error {
+  background: #fff2f0;
+  color: #8f332b;
+}
+
 .events-panel {
   overflow: hidden;
   border: 1px solid var(--color-line);
@@ -175,51 +195,41 @@
   border-top: 1px solid #edf1ec;
 }
 
-.event-input {
-  width: 100%;
-  min-width: 7rem;
-  min-height: 36px;
-  padding: 0.45rem 0.55rem;
-  border: 1px solid var(--color-line);
-  border-radius: 8px;
-  background: #fff;
-  color: var(--color-ink);
-  font-size: 0.78rem;
-}
-
-.event-input:focus {
-  border-color: var(--color-brand);
-  outline: 3px solid rgb(71 123 94 / 14%);
-}
-
-.event-input--title {
-  min-width: 9rem;
-  font-weight: 600;
-}
-
-.event-colors {
-  display: flex;
-  gap: 0.35rem;
-}
-
-.event-color {
-  width: 28px;
-  height: 28px;
-  padding: 2px;
-  border: 1px solid var(--color-line);
-  border-radius: 7px;
-  background: white;
-  cursor: pointer;
-}
-
-.events-table__actions {
-  text-align: right;
-}
-
 .events-empty {
   padding: 1.5rem !important;
   color: var(--color-muted);
   text-align: center;
+}
+
+.event-details-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-brand-dark);
+  font: inherit;
+  font-weight: 650;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.event-details-button:focus-visible {
+  outline: 3px solid rgb(71 123 94 / 28%);
+  outline-offset: 3px;
+}
+
+.participant-list {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.participant-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
 .modal-title {
@@ -230,16 +240,6 @@
 
 .modal-body p {
   margin-top: 0;
-}
-
-.modal-body pre {
-  overflow: auto;
-  max-height: 50vh;
-  padding: 1rem;
-  border-radius: 10px;
-  background: #f5f8f4;
-  color: var(--color-ink);
-  font-size: 0.78rem;
 }
 
 @media (max-width: 480px) {
@@ -272,6 +272,10 @@
   .calendar-toolbar {
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
+  }
+
+  .calendar-toolbar-actions {
+    justify-content: space-between;
   }
 
   .calendar-navigation {
