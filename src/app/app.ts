@@ -1,12 +1,12 @@
 import { Component, inject, signal } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { RouterLink, RouterOutlet } from '@angular/router';
 import { AuthenticationComponent } from './components/authentication-component/authentication-component';
 import { AuthService } from './services/auth.service';
 import { isDemoModeEnabled } from './demo-mode';
 
 @Component({
   selector: 'app-root',
-  imports: [AuthenticationComponent, RouterOutlet],
+  imports: [AuthenticationComponent, RouterLink, RouterOutlet],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })

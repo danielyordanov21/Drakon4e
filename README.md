@@ -4,38 +4,33 @@ Angular 21 calendar backed directly by Supabase. Query code is centralized in
 `CalendarService`; the browser only loads the current visible calendar range and
 does not keep an application-wide copy of people, events, or associations.
 
-## Supabase schema assumptions
+## Supabase setup
 
-The data-access layer and [`supabase/calendar.sql`](./supabase/calendar.sql)
-assume these existing columns:
+The app uses these tables:
 
 ```text
-people(id uuid, name text)
-events(id uuid, title text, starts_at timestamptz, ends_at timestamptz null)
+people(id uuid, name text, owner_id uuid)
+events(id uuid, title text, starts_at timestamptz, ends_at timestamptz null, owner_id uuid)
+event_people(event_id uuid, person_id uuid, owner_id uuid)
 ```
 
-The SQL creates only the `event_people` junction table; it does not recreate or
-delete existing people or events. If the deployed schema uses different names
-or types, adapt the migration and [`database.types.ts`](./src/app/models/database.types.ts)
-to match it. Existing rows in an already-created `event_people` table are left
-in place. It adds the composite primary key to an existing junction table if
-missing; if duplicate links exist, the migration fails instead of deleting
-data. The composite primary key prevents duplicate links, and foreign keys
-preserve referential integrity with cascading cleanup when a person or event is
-deleted.
+Run [`supabase/calendar.sql`](./supabase/calendar.sql) in the Supabase SQL
+Editor before using the production app. It creates missing tables, upgrades
+existing tables with account ownership, and installs owner-only RLS policies.
+Every account can access only its people, events, and links. Composite
+foreign keys prevent linking one account's event to another account's person.
+The migration replaces all existing RLS policies on these three tables; review
+any custom policies first. Legacy unowned rows require setting the initial
+owner email in the script. The live project was checked during development:
+the `people` and `events` tables exist and were empty, while `event_people` had
+not yet been created.
 
-Run the SQL in the Supabase SQL editor after reconciling its assumptions with
-the live schema. Its RLS policies assume a shared calendar: signed-in users can
-read people, events, and links, and can add/remove any link. Restrict these
-policies to the actual user/organization ownership model before using the
-application for private calendars. The client-side foreign keys are not
-authorization checks. Review and remove obsolete permissive policies already
-defined on these tables: PostgreSQL combines permissive policies using OR.
 The app includes email/password sign-in and account creation. It restores the
-stored Supabase session on startup and subscribes to auth changes. Configure
-email/password sign-in in Supabase Auth; if email confirmation is enabled,
-new users must confirm their address before signing in. The root view keeps
-calendar routes hidden unless a session is available.
+stored Supabase session on startup and subscribes to auth changes. Only signed-in
+users can see calendar routes. People can be created, renamed, or deleted at
+`/manage/people`. Calendar users can create events and manage their event
+participants; deleting a person or event deletes only the account-owned
+associations through database foreign keys.
 
 The date query treats event ranges as half-open (`starts_at < range end` and
 `ends_at > range start`), so events spanning into the visible period are
@@ -62,16 +57,19 @@ error until both values are set.
 Enable the Email provider in Supabase Auth. The sign-up flow uses the project's
 email-confirmation setting and displays a confirmation prompt if sign-up does
 not return a session. Configure the project's allowed redirect URLs if you
-later enable email links or password recovery. Add the local development
-origin (typically `http://localhost:4200`) and the deployed app origin to the
-Auth URL Configuration's redirect allow list so confirmation links return to
-the app.
+later enable email links or password recovery. Add both the local development
+origin (`http://localhost:4200`) and the deployed app origin to the Auth URL
+Configuration's redirect allow list so confirmation links return to the app.
 
-To initialize a fresh live project, create the `people` and `events` base
-tables using the schema documented above, run `supabase/calendar.sql` in the
-Supabase SQL Editor, then run `supabase/seed.sql` to add clearly labeled sample
-people, events, and links. The seed script is idempotent for its fixed sample
-IDs and only updates those sample rows.
+Supabase's default email sender is restricted and rate-limited. Use a team
+email for initial smoke tests or configure custom SMTP before public sign-up.
+For an existing account's sample records, set `seed_owner_email` in
+[`supabase/seed.sql`](./supabase/seed.sql), then run it after `calendar.sql`.
+The sample IDs are stable, clearly labeled, scoped to that account, and safe
+to re-seed.
+
+After applying the schema, run `supabase test db` to execute the cross-account
+RLS assertions in `supabase/tests/account_ownership_rls.test.sql`.
 
 ## Data access
 
@@ -82,6 +80,9 @@ IDs and only updates those sample rows.
 - `getEventsForPersonInRange(personId, range, options)` for one person's
   calendar, querying `events` through `event_people!inner(person_id)`.
 - `getParticipants(eventId)` for the event's associated people.
+- `createEvent(event)` and `deleteEvent(eventId)` for account-owned events.
+- `getPeople()`, `createPerson(name)`, `updatePerson(personId, name)`, and
+  `deletePerson(personId)` for account-owned people.
 - `addPersonToEvent(eventId, personId)` using an idempotent upsert against the
   composite primary key.
 - `removePersonFromEvent(eventId, personId)` to remove only that association.
@@ -92,6 +93,26 @@ aborts the previous Supabase HTTP request when the person or visible date range
 changes, preventing an old response from replacing the newest view. Event
 queries use the indexes created by the SQL migration. No extra cache or global
 database store is maintained.
+
+## Production deployment
+
+The project includes a Vercel configuration for Angular's
+`dist/Drakon4e/browser` production output and client-side route fallback.
+Connect the GitHub repository to Vercel and deploy with the `production` build
+configuration. GitHub Actions runs the tests and production build on pushes and
+pull requests.
+
+Before opening registration publicly:
+
+- Complete `supabase/calendar.sql` and verify access with two separate test
+  accounts; each should see only its own people/events.
+- Configure custom SMTP and confirm the email-confirmation redirect works on
+  the deployed origin.
+- Review Supabase Security Advisor, database backups/retention, SSL enforcement,
+  MFA on the Supabase organization, and operational monitoring.
+- Never add a Supabase secret/service-role key to this Angular app or Vercel
+  browser environment variables. The publishable key is intended to be public;
+  RLS is the authorization boundary.
 
 ## Development
 

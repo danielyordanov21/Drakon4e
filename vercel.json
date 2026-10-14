@@ -1,0 +1,5 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist/Drakon4e/browser",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}

@@ -41,6 +41,17 @@
   font-weight: 650;
 }
 
+.app-session a {
+  color: var(--color-brand-dark);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.app-session a:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
 .app-session button:disabled {
   cursor: wait;
   opacity: 0.7;

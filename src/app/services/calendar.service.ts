@@ -26,6 +26,12 @@ export interface CalendarPageOptions {
   signal?: AbortSignal;
 }
 
+export interface CalendarEventInput {
+  title: string;
+  starts_at: string;
+  ends_at: string | null;
+}
+
 const DEFAULT_PAGE_SIZE = 200;
 const MAX_PAGE_SIZE = 500;
 const DEFAULT_EVENT_COLOR: EventColor = {
@@ -33,7 +39,10 @@ const DEFAULT_EVENT_COLOR: EventColor = {
   secondary: '#eaf1e9',
 };
 
-type EventRow = Database['public']['Tables']['events']['Row'];
+type EventRow = Pick<
+  Database['public']['Tables']['events']['Row'],
+  'id' | 'title' | 'starts_at' | 'ends_at'
+>;
 
 @Injectable({
   providedIn: 'root',
@@ -139,6 +148,84 @@ export class CalendarService {
     return data ?? [];
   }
 
+  async createPerson(name: string): Promise<Person> {
+    const normalizedName = name.trim();
+    if (!normalizedName) {
+      throw new TypeError('Person name must not be empty.');
+    }
+
+    const { data, error } = await (await this.getClient())
+      .from('people')
+      .insert({ name: normalizedName })
+      .select('id,name')
+      .single();
+
+    if (error) {
+      throw new Error(`Could not create person: ${error.message}`, { cause: error });
+    }
+    return data;
+  }
+
+  async updatePerson(personId: Person['id'], name: string): Promise<void> {
+    const normalizedName = name.trim();
+    if (!personId.trim() || !normalizedName) {
+      throw new TypeError('Person ID and name must not be empty.');
+    }
+
+    const { error } = await (await this.getClient())
+      .from('people')
+      .update({ name: normalizedName })
+      .eq('id', personId);
+
+    if (error) {
+      throw new Error(`Could not update person: ${error.message}`, { cause: error });
+    }
+  }
+
+  async deletePerson(personId: Person['id']): Promise<void> {
+    if (!personId.trim()) {
+      throw new TypeError('Person ID must not be empty.');
+    }
+
+    const { error } = await (await this.getClient())
+      .from('people')
+      .delete()
+      .eq('id', personId);
+
+    if (error) {
+      throw new Error(`Could not delete person: ${error.message}`, { cause: error });
+    }
+  }
+
+  async createEvent(event: CalendarEventInput): Promise<string> {
+    const normalizedEvent = this.validateEventInput(event);
+    const { data, error } = await (await this.getClient())
+      .from('events')
+      .insert(normalizedEvent)
+      .select('id')
+      .single();
+
+    if (error) {
+      throw new Error(`Could not create event: ${error.message}`, { cause: error });
+    }
+    return data.id;
+  }
+
+  async deleteEvent(eventId: string): Promise<void> {
+    if (!eventId.trim()) {
+      throw new TypeError('Event ID must not be empty.');
+    }
+
+    const { error } = await (await this.getClient())
+      .from('events')
+      .delete()
+      .eq('id', eventId);
+
+    if (error) {
+      throw new Error(`Could not delete event: ${error.message}`, { cause: error });
+    }
+  }
+
   async addPersonToEvent(eventId: string, personId: Person['id']): Promise<void> {
     this.validateRelationshipIds(eventId, personId);
 
@@ -198,6 +285,28 @@ export class CalendarService {
     if (!eventId.trim() || !personId.trim()) {
       throw new TypeError('eventId and personId must not be empty.');
     }
+  }
+
+  private validateEventInput(event: CalendarEventInput): CalendarEventInput {
+    const title = event.title.trim();
+    const startsAt = new Date(event.starts_at);
+    const endsAt = event.ends_at === null ? null : new Date(event.ends_at);
+
+    if (!title) {
+      throw new TypeError('Event title must not be empty.');
+    }
+    if (Number.isNaN(startsAt.getTime())) {
+      throw new TypeError('Event start must be a valid date.');
+    }
+    if (endsAt && (Number.isNaN(endsAt.getTime()) || endsAt <= startsAt)) {
+      throw new RangeError('Event end must be later than its start.');
+    }
+
+    return {
+      title,
+      starts_at: startsAt.toISOString(),
+      ends_at: endsAt?.toISOString() ?? null,
+    };
   }
 
   private toPage(

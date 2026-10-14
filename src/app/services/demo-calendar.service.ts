@@ -1,7 +1,13 @@
 import { Injectable } from '@angular/core';
 import { CalendarEvent } from 'angular-calendar';
 import { EventColor } from 'calendar-utils';
-import { CalendarDateRange, CalendarEventRecord, CalendarPageOptions, EventPage } from './calendar.service';
+import {
+  CalendarDateRange,
+  CalendarEventInput,
+  CalendarEventRecord,
+  CalendarPageOptions,
+  EventPage,
+} from './calendar.service';
 import { Person } from '../models/person.model';
 
 interface DemoEvent {
@@ -25,6 +31,7 @@ const DEFAULT_EVENT_COLOR: EventColor = {
 @Injectable()
 export class DemoCalendarService {
   private readonly events = this.createEvents();
+  private nextEventId = this.events.length + 1;
   private readonly participants = new Map<string, Set<string>>([
     ['demo-event-1', new Set(['demo-alex', 'demo-jamie'])],
     ['demo-event-2', new Set(['demo-riley'])],
@@ -70,6 +77,34 @@ export class DemoCalendarService {
 
   async removePersonFromEvent(eventId: string, personId: Person['id']): Promise<void> {
     this.participants.get(eventId)?.delete(personId);
+  }
+
+  async createEvent(event: CalendarEventInput): Promise<string> {
+    const title = event.title.trim();
+    const startsAt = new Date(event.starts_at);
+    const endsAt = event.ends_at ? new Date(event.ends_at) : null;
+    if (!title) {
+      throw new TypeError('Event title must not be empty.');
+    }
+    if (Number.isNaN(startsAt.getTime())) {
+      throw new TypeError('Event start must be a valid date.');
+    }
+    if (endsAt && (Number.isNaN(endsAt.getTime()) || endsAt <= startsAt)) {
+      throw new RangeError('Event end must be later than its start.');
+    }
+
+    const id = `demo-event-${this.nextEventId++}`;
+    this.events.push({ id, title, startsAt, endsAt });
+    this.participants.set(id, new Set());
+    return id;
+  }
+
+  async deleteEvent(eventId: string): Promise<void> {
+    const eventIndex = this.events.findIndex(({ id }) => id === eventId);
+    if (eventIndex >= 0) {
+      this.events.splice(eventIndex, 1);
+    }
+    this.participants.delete(eventId);
   }
 
   private getPage(

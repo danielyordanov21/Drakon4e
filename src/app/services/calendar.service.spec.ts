@@ -26,6 +26,8 @@ describe('CalendarService', () => {
     const chain = vi.fn(() => query);
     query = {
       select: chain,
+      insert: chain,
+      update: chain,
       eq: chain,
       lt: chain,
       or: chain,
@@ -34,6 +36,12 @@ describe('CalendarService', () => {
       abortSignal: chain,
       upsert: chain,
       delete: vi.fn(() => query),
+      single: vi.fn(() =>
+        Promise.resolve({
+          data: { id: 'person-3', name: 'Jordan' },
+          error,
+        }),
+      ),
       then: (resolve: (result: unknown) => unknown) =>
         Promise.resolve({ data, error }).then(resolve),
     };
@@ -124,6 +132,60 @@ describe('CalendarService', () => {
       { id: 'person-1', name: 'Alex' },
       { id: 'person-2', name: 'Morgan' },
     ]);
+  });
+
+  it('creates a person with a normalized name', async () => {
+    const query = createQuery();
+    const { service } = setup(query);
+
+    await expect(service.createPerson('  Jordan  ')).resolves.toEqual({
+      id: 'person-3',
+      name: 'Jordan',
+    });
+    expect(query['insert']).toHaveBeenCalledWith({ name: 'Jordan' });
+    expect(query['select']).toHaveBeenCalledWith('id,name');
+  });
+
+  it('updates and deletes only the requested person', async () => {
+    const query = createQuery(null);
+    const { service } = setup(query);
+
+    await service.updatePerson('person-1', '  Alex Morgan  ');
+    expect(query['update']).toHaveBeenCalledWith({ name: 'Alex Morgan' });
+    expect(query['eq']).toHaveBeenCalledWith('id', 'person-1');
+
+    await service.deletePerson('person-1');
+    expect(query['delete']).toHaveBeenCalled();
+  });
+
+  it('creates events with normalized titles and valid timestamps', async () => {
+    const query = createQuery(null);
+    const { service } = setup(query);
+
+    await service.createEvent({
+      title: '  Planning  ',
+      starts_at: '2026-10-14T09:00:00.000Z',
+      ends_at: '2026-10-14T10:00:00.000Z',
+    });
+
+    expect(query['insert']).toHaveBeenCalledWith({
+      title: 'Planning',
+      starts_at: '2026-10-14T09:00:00.000Z',
+      ends_at: '2026-10-14T10:00:00.000Z',
+    });
+  });
+
+  it('rejects event ends that are not later than the start', async () => {
+    const query = createQuery(null);
+    const { service } = setup(query);
+
+    await expect(
+      service.createEvent({
+        title: 'Invalid',
+        starts_at: '2026-10-14T10:00:00.000Z',
+        ends_at: '2026-10-14T09:00:00.000Z',
+      }),
+    ).rejects.toThrow('Event end must be later than its start.');
   });
 
   it('uses an idempotent insert for a person-event association', async () => {

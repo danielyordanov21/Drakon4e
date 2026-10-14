@@ -1,0 +1,69 @@
+<main class="people-management" aria-labelledby="people-heading">
+  <header class="people-management__header">
+    <div>
+      <p class="people-management__eyebrow">Your account</p>
+      <h1 id="people-heading">Manage people</h1>
+      <p>Add and maintain the people on your calendar. Only you can see these records.</p>
+    </div>
+    <a routerLink="/">Back to calendar</a>
+  </header>
+
+  <section class="people-card" aria-label="Add or edit a person">
+    <form (ngSubmit)="savePerson()">
+      <label for="person-name">Name</label>
+      <input
+        id="person-name"
+        name="personName"
+        type="text"
+        autocomplete="name"
+        maxlength="120"
+        [(ngModel)]="name"
+        required
+      />
+      @if (errorMessage(); as error) {
+        <p class="people-error" role="alert">{{ error }}</p>
+      }
+      <div class="people-actions">
+        <button class="people-button people-button--primary" type="submit" [disabled]="saving()">
+          @if (saving()) {
+            Saving…
+          } @else {
+            {{ editingPersonId() ? 'Save changes' : 'Add person' }}
+          }
+        </button>
+        @if (editingPersonId()) {
+          <button class="people-button" type="button" (click)="cancelEditing()">Cancel</button>
+        }
+      </div>
+    </form>
+  </section>
+
+  <section class="people-card" aria-labelledby="people-list-heading">
+    <h2 id="people-list-heading">Your people</h2>
+    @if (loading()) {
+      <p role="status">Loading people…</p>
+    } @else {
+      <ul class="people-list">
+        @for (person of people(); track person.id) {
+          <li>
+            <span>{{ person.name }}</span>
+            <div class="people-actions">
+              <button class="people-button" type="button" (click)="startEditing(person)">
+                Edit
+              </button>
+              <button
+                class="people-button people-button--danger"
+                type="button"
+                (click)="deletePerson(person)"
+              >
+                Delete
+              </button>
+            </div>
+          </li>
+        } @empty {
+          <li class="people-empty">No people yet. Add someone above to get started.</li>
+        }
+      </ul>
+    }
+  </section>
+</main>

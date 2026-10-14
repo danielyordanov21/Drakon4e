@@ -42,6 +42,13 @@
 
     <div class="calendar-toolbar-actions">
       <app-person-button-component />
+      <button
+        type="button"
+        class="calendar-button calendar-button--primary"
+        (click)="openNewEventForm()"
+      >
+        New event
+      </button>
       <div class="calendar-view-switch" aria-label="Calendar view">
         <button
           type="button"
@@ -73,6 +80,41 @@
       </div>
     </div>
   </header>
+
+  @if (creatingEvent()) {
+    <form class="event-create-form" (ngSubmit)="createEvent()">
+      <label for="new-event-title">Event title</label>
+      <input
+        id="new-event-title"
+        name="title"
+        type="text"
+        maxlength="200"
+        [(ngModel)]="newEventTitle"
+        required
+      />
+      <label for="new-event-start">Starts</label>
+      <input
+        id="new-event-start"
+        name="startsAt"
+        type="datetime-local"
+        [(ngModel)]="newEventStartsAt"
+        required
+      />
+      <label for="new-event-end">Ends (optional)</label>
+      <input
+        id="new-event-end"
+        name="endsAt"
+        type="datetime-local"
+        [(ngModel)]="newEventEndsAt"
+      />
+      <div class="event-create-form__actions">
+        <button class="calendar-button calendar-button--primary" type="submit" [disabled]="savingEvent()">
+          {{ savingEvent() ? 'Saving…' : 'Save event' }}
+        </button>
+        <button class="calendar-button" type="button" (click)="cancelNewEvent()">Cancel</button>
+      </div>
+    </form>
+  }
 
   @if (loading()) {
     <p class="calendar-status" role="status">Loading events…</p>
@@ -188,23 +230,47 @@
         @for (participant of participants(); track participant.id) {
           <li>
             <span>{{ participant.name }}</span>
-            @if (participant.id === personId()) {
-              <button
-                type="button"
-                class="calendar-button calendar-button--danger"
-                (click)="removeParticipant(participant)"
-              >
-                Remove from event
-              </button>
-            }
+            <button
+              type="button"
+              class="calendar-button calendar-button--danger"
+              (click)="removeParticipant(participant)"
+            >
+              Remove from event
+            </button>
           </li>
         } @empty {
           <li>No participants.</li>
         }
       </ul>
+      @if (peopleToAdd().length > 0) {
+        <form class="participant-add-form" (ngSubmit)="addParticipant()">
+          <label for="add-participant">Add one of your people</label>
+          <select
+            id="add-participant"
+            name="participant"
+            [(ngModel)]="selectedPersonId"
+            required
+          >
+            <option value="" disabled>Select a person</option>
+            @for (person of peopleToAdd(); track person.id) {
+              <option [value]="person.id">{{ person.name }}</option>
+            }
+          </select>
+          <button class="calendar-button calendar-button--primary" type="submit" [disabled]="!selectedPersonId">
+            Add participant
+          </button>
+        </form>
+      }
     }
   </div>
   <div class="modal-footer">
+    <button
+      type="button"
+      class="calendar-button calendar-button--danger"
+      (click)="deleteEvent()"
+    >
+      Delete event
+    </button>
     <button type="button" class="calendar-button calendar-button--primary" (click)="close()">
       Done
     </button>

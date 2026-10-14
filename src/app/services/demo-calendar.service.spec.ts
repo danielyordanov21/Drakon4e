@@ -48,4 +48,24 @@ describe('DemoCalendarService', () => {
     const people = await service.getPeople();
     expect(people.map(({ name }) => name)).toEqual(['Alex Morgan', 'Jamie Lee', 'Riley Chen']);
   });
+
+  it('creates and deletes temporary demo events', async () => {
+    const now = new Date();
+    const range = {
+      start: new Date(now.getFullYear(), now.getMonth(), 1),
+      endExclusive: new Date(now.getFullYear(), now.getMonth() + 1, 1),
+    };
+    const createdId = await service.createEvent({
+      title: 'Demo-only event',
+      starts_at: new Date(now.getFullYear(), now.getMonth(), 20, 9).toISOString(),
+      ends_at: null,
+    });
+
+    const createdEvents = await service.getEventsInRange(range);
+    expect(createdEvents.events.some(({ id }) => id === createdId)).toBe(true);
+
+    await service.deleteEvent(createdId);
+    const remainingEvents = await service.getEventsInRange(range);
+    expect(remainingEvents.events.some(({ id }) => id === createdId)).toBe(false);
+  });
 });
