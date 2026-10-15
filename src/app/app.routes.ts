@@ -10,6 +10,13 @@ export const routes: Routes = [
     component: PeopleManagementComponent,
   },
   {
+    path: 'manage/events',
+    loadComponent: () =>
+      import('./components/events-management-component/events-management-component').then(
+        (component) => component.EventsManagementComponent,
+      ),
+  },
+  {
     path: '',
     component: CalendarComponent,
   },

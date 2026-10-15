@@ -28,9 +28,12 @@ not yet been created.
 The app includes email/password sign-in and account creation. It restores the
 stored Supabase session on startup and subscribes to auth changes. Only signed-in
 users can see calendar routes. People can be created, renamed, or deleted at
-`/manage/people`. Calendar users can create events and manage their event
-participants; deleting a person or event deletes only the account-owned
-associations through database foreign keys.
+`/manage/people`; expand a person’s event list there to assign or remove events
+for that person. Events can be created, updated, or deleted at `/manage/events`,
+where participants can also be assigned or removed. The calendar additionally
+supports event creation and participant management; creating an event from a
+person’s calendar links it to that person. Deleting a person or event deletes
+only the account-owned associations through database foreign keys.
 
 The date query treats event ranges as half-open (`starts_at < range end` and
 `ends_at > range start`), so events spanning into the visible period are
@@ -80,7 +83,10 @@ RLS assertions in `supabase/tests/account_ownership_rls.test.sql`.
 - `getEventsForPersonInRange(personId, range, options)` for one person's
   calendar, querying `events` through `event_people!inner(person_id)`.
 - `getParticipants(eventId)` for the event's associated people.
-- `createEvent(event)` and `deleteEvent(eventId)` for account-owned events.
+- `getEvents(options)` and `getEventsForPerson(personId, options)` for event
+  management and a person's assigned events.
+- `createEvent(event)`, `updateEvent(eventId, event)`, and
+  `deleteEvent(eventId)` for account-owned events.
 - `getPeople()`, `createPerson(name)`, `updatePerson(personId, name)`, and
   `deletePerson(personId)` for account-owned people.
 - `addPersonToEvent(eventId, personId)` using an idempotent upsert against the
@@ -93,6 +99,11 @@ aborts the previous Supabase HTTP request when the person or visible date range
 changes, preventing an old response from replacing the newest view. Event
 queries use the indexes created by the SQL migration. No extra cache or global
 database store is maintained.
+
+New people and events include the verified signed-in account's `owner_id`;
+the database's owner-only RLS policies still validate it against `auth.uid()`.
+This also keeps inserts working if an existing database is missing the
+`owner_id` column default from the schema setup.
 
 ## Production deployment
 

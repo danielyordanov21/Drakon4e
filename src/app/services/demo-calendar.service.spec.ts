@@ -68,4 +68,24 @@ describe('DemoCalendarService', () => {
     const remainingEvents = await service.getEventsInRange(range);
     expect(remainingEvents.events.some(({ id }) => id === createdId)).toBe(false);
   });
+
+  it('supports demo person CRUD and event updates', async () => {
+    const person = await service.createPerson(' Taylor Kim ');
+    expect(person.name).toBe('Taylor Kim');
+
+    await service.updatePerson(person.id, 'Taylor Updated');
+    expect((await service.getPeople()).some(({ name }) => name === 'Taylor Updated')).toBe(true);
+
+    await service.deletePerson(person.id);
+    expect((await service.getPeople()).some(({ id }) => id === person.id)).toBe(false);
+
+    await service.updateEvent('demo-event-1', {
+      title: 'Updated planning',
+      starts_at: '2026-10-14T09:00:00.000Z',
+      ends_at: null,
+    });
+    expect(
+      (await service.getAllEvents()).find(({ id }) => id === 'demo-event-1')?.title,
+    ).toBe('Updated planning');
+  });
 });

@@ -48,9 +48,12 @@ describe('CalendarService', () => {
     return query;
   }
 
-  function setup(query: Record<string, unknown>) {
+  function setup(query: Record<string, unknown>, user: { id: string } | null = { id: 'user-1' }) {
     const client = {
       from: vi.fn(() => query),
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user }, error: null }),
+      },
     };
     TestBed.configureTestingModule({
       providers: [
@@ -116,6 +119,33 @@ describe('CalendarService', () => {
     expect(participants).toEqual([{ id: 'person-1', name: 'Alex' }]);
   });
 
+  it('loads a page of all events in start-time order', async () => {
+    const query = createQuery();
+    const { service, client } = setup(query);
+
+    const page = await service.getEvents({ offset: 1, limit: 1 });
+
+    expect(client.from).toHaveBeenCalledWith('events');
+    expect(query['order']).toHaveBeenCalledWith('starts_at');
+    expect(query['order']).toHaveBeenCalledWith('id');
+    expect(query['range']).toHaveBeenCalledWith(1, 2);
+    expect(page.events).toHaveLength(1);
+    expect(page.hasMore).toBe(true);
+  });
+
+  it('loads all events linked to one person', async () => {
+    const query = createQuery(eventRows);
+    const { service } = setup(query);
+
+    const events = await service.getAllEventsForPerson('person-1');
+
+    expect(query['select']).toHaveBeenCalledWith(
+      'id,title,starts_at,ends_at,event_people!inner(person_id)',
+    );
+    expect(query['eq']).toHaveBeenCalledWith('event_people.person_id', 'person-1');
+    expect(events.map(({ id }) => id)).toEqual(['event-1', 'event-2']);
+  });
+
   it('loads all people in name order', async () => {
     const query = createQuery([
       { id: 'person-1', name: 'Alex' },
@@ -142,8 +172,18 @@ describe('CalendarService', () => {
       id: 'person-3',
       name: 'Jordan',
     });
-    expect(query['insert']).toHaveBeenCalledWith({ name: 'Jordan' });
+    expect(query['insert']).toHaveBeenCalledWith({ name: 'Jordan', owner_id: 'user-1' });
     expect(query['select']).toHaveBeenCalledWith('id,name');
+  });
+
+  it('requires a verified signed-in user before creating a person', async () => {
+    const query = createQuery();
+    const { service, client } = setup(query, null);
+
+    await expect(service.createPerson('Jordan')).rejects.toThrow(
+      'You must be signed in to create people or events.',
+    );
+    expect(client.from).not.toHaveBeenCalled();
   });
 
   it('updates and deletes only the requested person', async () => {
@@ -172,7 +212,26 @@ describe('CalendarService', () => {
       title: 'Planning',
       starts_at: '2026-10-14T09:00:00.000Z',
       ends_at: '2026-10-14T10:00:00.000Z',
+      owner_id: 'user-1',
     });
+  });
+
+  it('updates an event with normalized fields', async () => {
+    const query = createQuery(null);
+    const { service } = setup(query);
+
+    await service.updateEvent('event-1', {
+      title: '  Updated planning  ',
+      starts_at: '2026-10-15T09:00:00.000Z',
+      ends_at: null,
+    });
+
+    expect(query['update']).toHaveBeenCalledWith({
+      title: 'Updated planning',
+      starts_at: '2026-10-15T09:00:00.000Z',
+      ends_at: null,
+    });
+    expect(query['eq']).toHaveBeenCalledWith('id', 'event-1');
   });
 
   it('rejects event ends that are not later than the start', async () => {

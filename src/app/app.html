@@ -20,6 +20,7 @@
         Signed in{{ auth.session()?.user?.email ? ' as ' + auth.session()?.user?.email : '' }}
       </span>
       <a routerLink="/manage/people">Manage people</a>
+      <a routerLink="/manage/events">Manage events</a>
       <button type="button" (click)="signOut()" [disabled]="signingOut()">
         {{ signingOut() ? 'Signing out…' : 'Sign out' }}
       </button>

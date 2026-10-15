@@ -79,6 +79,63 @@ export class CalendarService {
     return this.toPage(data ?? [], limit, offset);
   }
 
+  async getEvents(options: CalendarPageOptions = {}): Promise<EventPage> {
+    const { offset, limit } = this.validatePageOptions(options);
+    const { data, error } = await (await this.getClient())
+      .from('events')
+      .select('id,title,starts_at,ends_at')
+      .order('starts_at')
+      .order('id')
+      .range(offset, offset + limit)
+      .abortSignal(options.signal ?? new AbortController().signal);
+
+    if (error) {
+      throw new Error(`Could not load events: ${error.message}`, { cause: error });
+    }
+    return this.toPage(data ?? [], limit, offset);
+  }
+
+  async getEventsForPerson(
+    personId: Person['id'],
+    options: CalendarPageOptions = {},
+  ): Promise<EventPage> {
+    const { offset, limit } = this.validatePageOptions(options);
+    if (!personId.trim()) {
+      throw new TypeError('personId must not be empty.');
+    }
+
+    const { data, error } = await (await this.getClient())
+      .from('events')
+      .select('id,title,starts_at,ends_at,event_people!inner(person_id)')
+      .eq('event_people.person_id', personId)
+      .order('starts_at')
+      .order('id')
+      .range(offset, offset + limit)
+      .abortSignal(options.signal ?? new AbortController().signal);
+
+    if (error) {
+      throw new Error(`Could not load this person's events: ${error.message}`, {
+        cause: error,
+      });
+    }
+    return this.toPage(data ?? [], limit, offset);
+  }
+
+  async getAllEvents(signal?: AbortSignal): Promise<CalendarEventRecord[]> {
+    return this.getAllEventsFromPages((offset) =>
+      this.getEvents({ offset, signal }),
+    );
+  }
+
+  async getAllEventsForPerson(
+    personId: Person['id'],
+    signal?: AbortSignal,
+  ): Promise<CalendarEventRecord[]> {
+    return this.getAllEventsFromPages((offset) =>
+      this.getEventsForPerson(personId, { offset, signal }),
+    );
+  }
+
   async getEventsForPersonInRange(
     personId: Person['id'],
     range: CalendarDateRange,
@@ -154,9 +211,11 @@ export class CalendarService {
       throw new TypeError('Person name must not be empty.');
     }
 
-    const { data, error } = await (await this.getClient())
+    const client = await this.getClient();
+    const ownerId = await this.getAuthenticatedOwnerId(client);
+    const { data, error } = await client
       .from('people')
-      .insert({ name: normalizedName })
+      .insert({ name: normalizedName, owner_id: ownerId })
       .select('id,name')
       .single();
 
@@ -199,9 +258,11 @@ export class CalendarService {
 
   async createEvent(event: CalendarEventInput): Promise<string> {
     const normalizedEvent = this.validateEventInput(event);
-    const { data, error } = await (await this.getClient())
+    const client = await this.getClient();
+    const ownerId = await this.getAuthenticatedOwnerId(client);
+    const { data, error } = await client
       .from('events')
-      .insert(normalizedEvent)
+      .insert({ ...normalizedEvent, owner_id: ownerId })
       .select('id')
       .single();
 
@@ -209,6 +270,21 @@ export class CalendarService {
       throw new Error(`Could not create event: ${error.message}`, { cause: error });
     }
     return data.id;
+  }
+
+  async updateEvent(eventId: string, event: CalendarEventInput): Promise<void> {
+    if (!eventId.trim()) {
+      throw new TypeError('Event ID must not be empty.');
+    }
+    const normalizedEvent = this.validateEventInput(event);
+    const { error } = await (await this.getClient())
+      .from('events')
+      .update(normalizedEvent)
+      .eq('id', eventId);
+
+    if (error) {
+      throw new Error(`Could not update event: ${error.message}`, { cause: error });
+    }
   }
 
   async deleteEvent(eventId: string): Promise<void> {
@@ -272,6 +348,37 @@ export class CalendarService {
       throw new RangeError(`Calendar page limit must be between 1 and ${MAX_PAGE_SIZE}.`);
     }
     return { offset, limit };
+  }
+
+  private async getAuthenticatedOwnerId(
+    client: Awaited<ReturnType<typeof this.getClient>>,
+  ): Promise<string> {
+    const { data, error } = await client.auth.getUser();
+    if (error) {
+      throw new Error(`Could not verify the signed-in user: ${error.message}`, {
+        cause: error,
+      });
+    }
+    if (!data.user) {
+      throw new Error('You must be signed in to create people or events.');
+    }
+    return data.user.id;
+  }
+
+  private async getAllEventsFromPages(
+    loadPage: (offset: number) => Promise<EventPage>,
+  ): Promise<CalendarEventRecord[]> {
+    const events: CalendarEventRecord[] = [];
+    let offset = 0;
+
+    while (true) {
+      const page = await loadPage(offset);
+      events.push(...page.events);
+      if (!page.hasMore) {
+        return events;
+      }
+      offset += page.events.length;
+    }
   }
 
   private toIsoString(date: Date, fieldName: string): string {

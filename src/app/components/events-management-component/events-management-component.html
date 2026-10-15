@@ -1,0 +1,134 @@
+<main class="events-management" aria-labelledby="events-heading">
+  <header class="events-management__header">
+    <div>
+      <p class="events-management__eyebrow">Your account</p>
+      <h1 id="events-heading">Manage events</h1>
+      <p>Create, update, and remove events, then assign people to each event.</p>
+    </div>
+    <nav aria-label="Management navigation">
+      <a routerLink="/manage/people">Manage people</a>
+      <a routerLink="/">Back to calendar</a>
+    </nav>
+  </header>
+
+  <section class="events-card" aria-labelledby="event-form-heading">
+    <h2 id="event-form-heading">{{ editingEventId() ? 'Edit event' : 'Add an event' }}</h2>
+    <form (ngSubmit)="saveEvent()">
+      <label for="event-title">Title</label>
+      <input
+        id="event-title"
+        name="title"
+        type="text"
+        maxlength="200"
+        [(ngModel)]="title"
+        required
+      />
+      <label for="event-start">Starts</label>
+      <input
+        id="event-start"
+        name="startsAt"
+        type="datetime-local"
+        [(ngModel)]="startsAt"
+        required
+      />
+      <label for="event-end">Ends (optional)</label>
+      <input
+        id="event-end"
+        name="endsAt"
+        type="datetime-local"
+        [(ngModel)]="endsAt"
+      />
+      <div class="events-actions">
+        <button class="events-button events-button--primary" type="submit" [disabled]="saving()">
+          {{ saving() ? 'Saving…' : editingEventId() ? 'Save changes' : 'Add event' }}
+        </button>
+        @if (editingEventId()) {
+          <button class="events-button" type="button" (click)="cancelEditing()">Cancel</button>
+        }
+      </div>
+    </form>
+  </section>
+
+  @if (errorMessage(); as error) {
+    <p class="events-error" role="alert">{{ error }}</p>
+  }
+
+  <section class="events-card" aria-labelledby="event-list-heading">
+    <h2 id="event-list-heading">Your events</h2>
+    @if (loading()) {
+      <p role="status">Loading events…</p>
+    } @else {
+      <ul class="event-list">
+        @for (event of events(); track event.id) {
+          <li>
+            <div class="event-list__summary">
+              <strong>{{ event.title }}</strong>
+              <span>
+                {{ event.start | date:'medium' }}{{ event.end ? ' – ' + (event.end | date:'medium') : '' }}
+              </span>
+            </div>
+            <div class="events-actions">
+              <button class="events-button" type="button" (click)="toggleParticipants(event)">
+                {{ managingEventId() === event.id ? 'Hide people' : 'Manage people' }}
+              </button>
+              <button class="events-button" type="button" (click)="startEditing(event)">Edit</button>
+              <button
+                class="events-button events-button--danger"
+                type="button"
+                (click)="deleteEvent(event)"
+              >
+                Delete
+              </button>
+            </div>
+            @if (managingEventId() === event.id) {
+              <section class="event-people" [attr.aria-label]="'People for ' + event.title">
+                <h3>People attending</h3>
+                <ul class="event-list event-list--people">
+                  @for (person of participants(); track person.id) {
+                    <li>
+                      <span>{{ person.name }}</span>
+                      <button
+                        class="events-button events-button--danger"
+                        type="button"
+                        (click)="removePersonFromEvent(person)"
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  } @empty {
+                    <li class="event-list__empty">No people assigned.</li>
+                  }
+                </ul>
+                @if (peopleToAdd().length > 0) {
+                  <form class="event-people__form" (ngSubmit)="addPersonToEvent()">
+                    <label [for]="'event-person-' + event.id">Add a person</label>
+                    <select
+                      [id]="'event-person-' + event.id"
+                      [name]="'eventPerson-' + event.id"
+                      [(ngModel)]="selectedPersonId"
+                      required
+                    >
+                      <option value="" disabled>Select a person</option>
+                      @for (person of peopleToAdd(); track person.id) {
+                        <option [value]="person.id">{{ person.name }}</option>
+                      }
+                    </select>
+                    <button
+                      class="events-button events-button--primary"
+                      type="submit"
+                      [disabled]="!selectedPersonId"
+                    >
+                      Add person to event
+                    </button>
+                  </form>
+                }
+              </section>
+            }
+          </li>
+        } @empty {
+          <li class="event-list__empty">No events yet. Add one above to get started.</li>
+        }
+      </ul>
+    }
+  </section>
+</main>
