@@ -218,16 +218,6 @@
   outline-offset: 3px;
 }
 
-.modal-title {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: 1.1rem;
-}
-
-.modal-body p {
-  margin-top: 0;
-}
-
 @media (max-width: 480px) {
   .calendar-view {
     gap: 0.75rem;

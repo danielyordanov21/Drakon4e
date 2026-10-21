@@ -13,10 +13,16 @@ describe('EventsManagementComponent', () => {
     end: new Date('2026-10-14T10:00:00.000Z'),
     color: { primary: '#477b5e', secondary: '#eaf1e9' },
   };
+  const nextEvent: CalendarEventRecord = {
+    ...event,
+    id: 'event-2',
+    title: 'Review',
+    start: new Date('2026-10-15T09:00:00.000Z'),
+  };
   const person: Person = { id: 'person-1', name: 'Alex Morgan' };
   const calendarService = {
-    getAllEvents: vi.fn().mockResolvedValue([event]),
-    getPeople: vi.fn().mockResolvedValue([person]),
+    getEvents: vi.fn().mockResolvedValue({ events: [event], hasMore: false, nextOffset: null }),
+    getPeople: vi.fn().mockResolvedValue({ people: [person], hasMore: false, nextOffset: null }),
     createEvent: vi.fn().mockResolvedValue('event-2'),
     updateEvent: vi.fn().mockResolvedValue(undefined),
     deleteEvent: vi.fn().mockResolvedValue(undefined),
@@ -27,8 +33,16 @@ describe('EventsManagementComponent', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    calendarService.getAllEvents.mockResolvedValue([event]);
-    calendarService.getPeople.mockResolvedValue([person]);
+    calendarService.getEvents.mockResolvedValue({
+      events: [event],
+      hasMore: false,
+      nextOffset: null,
+    });
+    calendarService.getPeople.mockResolvedValue({
+      people: [person],
+      hasMore: false,
+      nextOffset: null,
+    });
     calendarService.getParticipants.mockResolvedValue([person]);
 
     await TestBed.configureTestingModule({
@@ -40,7 +54,7 @@ describe('EventsManagementComponent', () => {
     }).compileComponents();
   });
 
-  it('creates an event and refreshes the event list', async () => {
+  it('creates an event without reloading the complete event list', async () => {
     const fixture = TestBed.createComponent(EventsManagementComponent);
     const component = fixture.componentInstance;
     fixture.detectChanges();
@@ -51,12 +65,53 @@ describe('EventsManagementComponent', () => {
     component.endsAt = '';
     await component.saveEvent();
 
-    expect(calendarService.createEvent).toHaveBeenCalledWith({
-      title: 'New event',
-      starts_at: new Date('2026-10-15T09:00').toISOString(),
-      ends_at: null,
-    } satisfies CalendarEventInput);
-    expect(calendarService.getAllEvents).toHaveBeenCalledTimes(2);
+    expect(calendarService.createEvent).toHaveBeenCalledWith(
+      {
+        title: 'New event',
+        starts_at: new Date('2026-10-15T09:00').toISOString(),
+        ends_at: null,
+      } satisfies CalendarEventInput,
+      [],
+    );
+    expect(component.events().map(({ id }) => id)).toContain('event-2');
+    expect(calendarService.getEvents).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes selected account people when creating an event', async () => {
+    const fixture = TestBed.createComponent(EventsManagementComponent);
+    const component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    component.title = 'Team meeting';
+    component.startsAt = '2026-10-15T09:00';
+    component.toggleCreationParticipant(person.id, true);
+    await component.saveEvent();
+
+    expect(calendarService.createEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Team meeting' }),
+      ['person-1'],
+    );
+  });
+
+  it('loads another bounded page of events when requested', async () => {
+    calendarService.getEvents
+      .mockResolvedValueOnce({ events: [event], hasMore: true, nextOffset: 1 })
+      .mockResolvedValueOnce({ events: [nextEvent], hasMore: false, nextOffset: null });
+    const fixture = TestBed.createComponent(EventsManagementComponent);
+    const component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await vi.waitFor(() => expect(component.hasMoreEvents()).toBe(true));
+
+    await component.loadMoreEvents();
+
+    expect(component.events().map(({ id }) => id)).toEqual(['event-1', 'event-2']);
+    expect(component.hasMoreEvents()).toBe(false);
+    expect(calendarService.getEvents).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ offset: 1, limit: 200 }),
+    );
   });
 
   it('edits an event and assigns a person to it', async () => {

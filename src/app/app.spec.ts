@@ -8,6 +8,7 @@ import { SUPABASE_CLIENT } from './services/supabase-client';
 import { AuthService } from './services/auth.service';
 import { App } from './app';
 import { routes } from './app.routes';
+import { I18nService } from './services/i18n.service';
 
 describe('App', () => {
   const session: Session = {
@@ -54,7 +55,12 @@ describe('App', () => {
               hasMore: false,
               nextOffset: null,
             }),
-            getPeople: vi.fn().mockResolvedValue([]),
+            getPeople: vi.fn().mockResolvedValue({
+              people: [{ id: 'person-1', name: 'Alex' }],
+              hasMore: false,
+              nextOffset: null,
+            }),
+            getPerson: vi.fn().mockResolvedValue({ id: 'person-1', name: 'Alex' }),
             getParticipants: vi.fn().mockResolvedValue([]),
           },
         },
@@ -80,6 +86,7 @@ describe('App', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('Your schedule');
     expect(compiled.textContent).toContain('Events');
+    expect(compiled.querySelector('.person-picker__trigger')).not.toBeNull();
   });
 
   it('should render the calendar route', async () => {
@@ -102,6 +109,9 @@ describe('App', () => {
 
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('Signed in as user@example.com');
+    const header = compiled.querySelector('.app-header');
+    expect(header?.querySelector('.app-navigation')).not.toBeNull();
+    expect(header?.querySelector('.app-session')).not.toBeNull();
   });
 
   it("should render a person page with that person's calendar", async () => {
@@ -112,9 +122,65 @@ describe('App', () => {
     await router.navigateByUrl('/people/person-1');
     fixture.detectChanges();
     await fixture.whenStable();
+    fixture.detectChanges();
 
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.textContent).toContain('Person person-1');
+    expect(compiled.textContent).toContain('Alex');
     expect(compiled.textContent).toContain('Events');
+    expect(compiled.querySelector('.person-picker__trigger')).not.toBeNull();
+  });
+
+  it('shows the person dropdown on the people management page', async () => {
+    const fixture = TestBed.createComponent(App);
+    const router = TestBed.inject(Router);
+
+    fixture.detectChanges();
+    await router.navigateByUrl('/manage/people');
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('.person-picker__trigger'),
+    ).not.toBeNull();
+  });
+
+  it('defaults the shared application UI to Bulgarian', async () => {
+    const fixture = TestBed.createComponent(App);
+    const router = TestBed.inject(Router);
+    const i18n = TestBed.inject(I18nService);
+
+    expect(i18n.defaultLanguage).toBe('bg');
+    fixture.detectChanges();
+    await router.navigateByUrl('/');
+    await i18n.setLanguage(i18n.defaultLanguage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('Управление на хора');
+    expect(compiled.textContent).toContain('Вашият график');
+    expect(document.documentElement.lang).toBe('bg');
+  });
+
+  it('switches the shared application UI to Bulgarian at runtime', async () => {
+    const fixture = TestBed.createComponent(App);
+    const router = TestBed.inject(Router);
+    const i18n = TestBed.inject(I18nService);
+
+    fixture.detectChanges();
+    await router.navigateByUrl('/');
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    await i18n.setLanguage('en');
+    expect(i18n.t('calendar.yourSchedule')).toBe('Your schedule');
+    await i18n.setLanguage('bg');
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('Управление на хора');
+    expect(compiled.textContent).toContain('Вашият график');
+    expect(compiled.textContent).toContain('Изберете човек');
+    expect(document.documentElement.lang).toBe('bg');
   });
 });

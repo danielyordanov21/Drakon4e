@@ -11,6 +11,10 @@ begin;
 create table if not exists public.people (
   id uuid primary key default gen_random_uuid(),
   name text not null,
+  grade smallint,
+  books text,
+  notes text,
+  small_notes text,
   owner_id uuid
 );
 
@@ -23,7 +27,11 @@ create table if not exists public.events (
 );
 
 alter table public.people
-  add column if not exists owner_id uuid;
+  add column if not exists owner_id uuid,
+  add column if not exists grade smallint,
+  add column if not exists books text,
+  add column if not exists notes text,
+  add column if not exists small_notes text;
 alter table public.events
   add column if not exists owner_id uuid;
 
@@ -228,3 +236,5 @@ create policy "Owners can remove their event people"
   using ((select auth.uid()) = owner_id);
 
 commit;
+
+notify pgrst, 'reload schema';

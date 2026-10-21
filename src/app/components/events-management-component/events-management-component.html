@@ -1,20 +1,22 @@
 <main class="events-management" aria-labelledby="events-heading">
   <header class="events-management__header">
     <div>
-      <p class="events-management__eyebrow">Your account</p>
-      <h1 id="events-heading">Manage events</h1>
-      <p>Create, update, and remove events, then assign people to each event.</p>
+      <p class="events-management__eyebrow">{{ i18n.t('events.eyebrow') }}</p>
+      <h1 id="events-heading">{{ i18n.t('events.heading') }}</h1>
+      <p>{{ i18n.t('events.intro') }}</p>
     </div>
-    <nav aria-label="Management navigation">
-      <a routerLink="/manage/people">Manage people</a>
-      <a routerLink="/">Back to calendar</a>
+    <nav [attr.aria-label]="i18n.t('events.navigation')">
+      <a routerLink="/manage/people">{{ i18n.t('events.managePeople') }}</a>
+      <a routerLink="/">{{ i18n.t('events.backToCalendar') }}</a>
     </nav>
   </header>
 
   <section class="events-card" aria-labelledby="event-form-heading">
-    <h2 id="event-form-heading">{{ editingEventId() ? 'Edit event' : 'Add an event' }}</h2>
+    <h2 id="event-form-heading">
+      {{ editingEventId() ? i18n.t('events.editEvent') : i18n.t('events.addEvent') }}
+    </h2>
     <form (ngSubmit)="saveEvent()">
-      <label for="event-title">Title</label>
+      <label for="event-title">{{ i18n.t('events.title') }}</label>
       <input
         id="event-title"
         name="title"
@@ -23,7 +25,7 @@
         [(ngModel)]="title"
         required
       />
-      <label for="event-start">Starts</label>
+      <label for="event-start">{{ i18n.t('events.starts') }}</label>
       <input
         id="event-start"
         name="startsAt"
@@ -31,19 +33,64 @@
         [(ngModel)]="startsAt"
         required
       />
-      <label for="event-end">Ends (optional)</label>
+      <label for="event-end">{{ i18n.t('events.endsOptional') }}</label>
       <input
         id="event-end"
         name="endsAt"
         type="datetime-local"
         [(ngModel)]="endsAt"
       />
+      @if (!editingEventId()) {
+        <fieldset class="event-participant-picker" [disabled]="saving() || loading()">
+          <legend>{{ i18n.t('events.participantsOptional') }}</legend>
+          @if (loading()) {
+            <p role="status">{{ i18n.t('events.loadingPeople') }}</p>
+          } @else {
+            @for (person of people(); track person.id) {
+              <label class="event-participant-picker__person">
+                <input
+                  type="checkbox"
+                  [name]="'new-event-person-' + person.id"
+                  [ngModel]="selectedParticipantIds().includes(person.id)"
+                  (ngModelChange)="toggleCreationParticipant(person.id, $event)"
+                  [ngModelOptions]="{ standalone: true }"
+                />
+                {{ person.name }}
+              </label>
+            } @empty {
+              <p>{{ i18n.t('events.noPeopleToAssign') }}</p>
+            }
+            @if (hasMorePeople()) {
+              <button
+                class="events-button"
+                type="button"
+                (click)="loadMorePeople()"
+                [disabled]="loadingMorePeople()"
+              >
+                {{
+                  loadingMorePeople()
+                    ? i18n.t('events.loadingMorePeople')
+                    : i18n.t('events.loadMorePeople')
+                }}
+              </button>
+            }
+          }
+        </fieldset>
+      }
       <div class="events-actions">
         <button class="events-button events-button--primary" type="submit" [disabled]="saving()">
-          {{ saving() ? 'Saving…' : editingEventId() ? 'Save changes' : 'Add event' }}
+          {{
+            saving()
+              ? i18n.t('events.saving')
+              : editingEventId()
+                ? i18n.t('events.saveChanges')
+                : i18n.t('events.addEventButton')
+          }}
         </button>
         @if (editingEventId()) {
-          <button class="events-button" type="button" (click)="cancelEditing()">Cancel</button>
+          <button class="events-button" type="button" (click)="cancelEditing()">
+            {{ i18n.t('events.cancel') }}
+          </button>
         }
       </div>
     </form>
@@ -54,9 +101,9 @@
   }
 
   <section class="events-card" aria-labelledby="event-list-heading">
-    <h2 id="event-list-heading">Your events</h2>
+    <h2 id="event-list-heading">{{ i18n.t('events.yourEvents') }}</h2>
     @if (loading()) {
-      <p role="status">Loading events…</p>
+      <p role="status">{{ i18n.t('events.loadingEvents') }}</p>
     } @else {
       <ul class="event-list">
         @for (event of events(); track event.id) {
@@ -64,51 +111,76 @@
             <div class="event-list__summary">
               <strong>{{ event.title }}</strong>
               <span>
-                {{ event.start | date:'medium' }}{{ event.end ? ' – ' + (event.end | date:'medium') : '' }}
+                {{ event.start | date:'medium':undefined:i18n.locale() }}{{ event.end ? ' – ' + (event.end | date:'medium':undefined:i18n.locale()) : '' }}
               </span>
             </div>
             <div class="events-actions">
               <button class="events-button" type="button" (click)="toggleParticipants(event)">
-                {{ managingEventId() === event.id ? 'Hide people' : 'Manage people' }}
+                {{
+                  managingEventId() === event.id
+                    ? i18n.t('events.hidePeople')
+                    : i18n.t('events.managePeopleButton')
+                }}
               </button>
-              <button class="events-button" type="button" (click)="startEditing(event)">Edit</button>
+              <button class="events-button" type="button" (click)="startEditing(event)">
+                {{ i18n.t('events.edit') }}
+              </button>
               <button
                 class="events-button events-button--danger"
                 type="button"
                 (click)="deleteEvent(event)"
+                [disabled]="deletingEventId() !== null"
               >
-                Delete
+                {{
+                  deletingEventId() === event.id
+                    ? i18n.t('events.deleting')
+                    : i18n.t('events.delete')
+                }}
               </button>
             </div>
             @if (managingEventId() === event.id) {
-              <section class="event-people" [attr.aria-label]="'People for ' + event.title">
-                <h3>People attending</h3>
-                <ul class="event-list event-list--people">
-                  @for (person of participants(); track person.id) {
-                    <li>
-                      <span>{{ person.name }}</span>
-                      <button
-                        class="events-button events-button--danger"
-                        type="button"
-                        (click)="removePersonFromEvent(person)"
-                      >
-                        Remove
-                      </button>
-                    </li>
-                  } @empty {
-                    <li class="event-list__empty">No people assigned.</li>
-                  }
-                </ul>
+              <section
+                class="event-people"
+                [attr.aria-label]="i18n.t('events.peopleFor', { event: event.title })"
+              >
+                <h3>{{ i18n.t('events.peopleAttending') }}</h3>
+                @if (loadingParticipants()) {
+                  <p role="status">{{ i18n.t('events.loadingPeople') }}</p>
+                } @else {
+                  <ul class="event-list event-list--people">
+                    @for (person of participants(); track person.id) {
+                      <li>
+                        <span>{{ person.name }}</span>
+                        <button
+                          class="events-button events-button--danger"
+                          type="button"
+                          (click)="removePersonFromEvent(person)"
+                          [disabled]="changingParticipantId() !== null"
+                        >
+                          {{
+                            changingParticipantId() === person.id
+                              ? i18n.t('events.removing')
+                              : i18n.t('events.remove')
+                          }}
+                        </button>
+                      </li>
+                    } @empty {
+                      <li class="event-list__empty">{{ i18n.t('events.noPeopleAssigned') }}</li>
+                    }
+                  </ul>
+                }
                 @if (peopleToAdd().length > 0) {
                   <form class="event-people__form" (ngSubmit)="addPersonToEvent()">
-                    <label [for]="'event-person-' + event.id">Add a person</label>
+                    <label [for]="'event-person-' + event.id">
+                      {{ i18n.t('events.addPerson') }}
+                    </label>
                     <select
                       [id]="'event-person-' + event.id"
                       [name]="'eventPerson-' + event.id"
                       [(ngModel)]="selectedPersonId"
                       required
                     >
-                      <option value="" disabled>Select a person</option>
+                      <option value="" disabled>{{ i18n.t('events.selectPerson') }}</option>
                       @for (person of peopleToAdd(); track person.id) {
                         <option [value]="person.id">{{ person.name }}</option>
                       }
@@ -116,19 +188,47 @@
                     <button
                       class="events-button events-button--primary"
                       type="submit"
-                      [disabled]="!selectedPersonId"
+                      [disabled]="!selectedPersonId || changingParticipantId() !== null"
                     >
-                      Add person to event
+                      {{ i18n.t('events.addPersonToEvent') }}
                     </button>
                   </form>
+                }
+                @if (hasMorePeople()) {
+                  <button
+                    class="events-button"
+                    type="button"
+                    (click)="loadMorePeople()"
+                    [disabled]="loadingMorePeople()"
+                  >
+                    {{
+                      loadingMorePeople()
+                        ? i18n.t('events.loadingMorePeople')
+                        : i18n.t('events.loadMorePeople')
+                    }}
+                  </button>
                 }
               </section>
             }
           </li>
         } @empty {
-          <li class="event-list__empty">No events yet. Add one above to get started.</li>
+          <li class="event-list__empty">{{ i18n.t('events.noEvents') }}</li>
         }
       </ul>
+      @if (hasMoreEvents()) {
+        <button
+          class="events-button"
+          type="button"
+          (click)="loadMoreEvents()"
+          [disabled]="loadingMoreEvents()"
+        >
+          {{
+            loadingMoreEvents()
+              ? i18n.t('events.loadingEvents')
+              : i18n.t('events.loadMoreEvents')
+          }}
+        </button>
+      }
     }
   </section>
 </main>

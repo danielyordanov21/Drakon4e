@@ -1,16 +1,12 @@
 import { DatePipe } from '@angular/common';
 import {
-  computed,
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
-  TemplateRef,
-  ViewChild,
   inject,
   input,
   signal,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import {
   addDays,
@@ -52,12 +48,14 @@ import {
   tap,
 } from 'rxjs';
 import { Person } from '../../models/person.model';
-import { PersonButtonComponent } from '../person-button-component/person-button-component';
 import {
   CalendarDateRange,
   CalendarEventRecord,
   CalendarService,
 } from '../../services/calendar.service';
+import { I18nService } from '../../services/i18n.service';
+import { CalendarEventFormComponent } from '../calendar-event-form/calendar-event-form';
+import { CalendarEventParticipantsComponent } from '../calendar-event-participants/calendar-event-participants';
 
 interface CalendarRequest {
   range: CalendarDateRange;
@@ -78,53 +76,33 @@ interface CalendarRequest {
     CalendarDayViewComponent,
     CalendarDatePipe,
     DatePipe,
-    FormsModule,
-    PersonButtonComponent,
+    CalendarEventFormComponent,
   ],
   styleUrl: './calendar-component.scss',
   providers: [provideCalendar({ provide: DateAdapter, useFactory: adapterFactory })],
 })
 export class CalendarComponent {
-  @ViewChild('modalContent', { static: true }) modalContent!: TemplateRef<unknown>;
-
   private readonly calendarService = inject(CalendarService);
+  readonly i18n = inject(I18nService);
   private readonly modal = inject(NgbModal);
   private readonly destroyRef = inject(DestroyRef);
   private readonly rangeChanges = new Subject<void>();
   private readonly loadMoreRequests = new Subject<void>();
-  private participantsController: AbortController | null = null;
 
   readonly personId = input<Person['id']>();
   readonly events = signal<CalendarEventRecord[]>([]);
   readonly loading = signal(false);
   readonly hasMore = signal(false);
   readonly errorMessage = signal<string | null>(null);
-  readonly participants = signal<Person[]>([]);
-  readonly availablePeople = signal<Person[]>([]);
-  readonly participantsLoading = signal(false);
-  readonly participantsError = signal<string | null>(null);
-  readonly peopleToAdd = computed(() =>
-    this.availablePeople().filter(
-      (person) => !this.participants().some(({ id }) => id === person.id),
-    ),
-  );
   readonly creatingEvent = signal(false);
-  readonly savingEvent = signal(false);
 
   view: CalendarView = CalendarView.Month;
   CalendarView = CalendarView;
   viewDate = new Date();
   readonly refresh = new Subject<void>();
   activeDayIsOpen = false;
-  modalEvent: CalendarEventRecord | null = null;
-  newEventTitle = '';
-  newEventStartsAt = '';
-  newEventEndsAt = '';
-  selectedPersonId = '';
 
   constructor() {
-    this.destroyRef.onDestroy(() => this.participantsController?.abort());
-
     toObservable(this.personId)
       .pipe(
         distinctUntilChanged(),
@@ -190,45 +168,9 @@ export class CalendarComponent {
     if (isSameMonth(date, this.viewDate)) {
       this.activeDayIsOpen =
         !(isSameDay(this.viewDate, date) && this.activeDayIsOpen) && events.length > 0;
-      this.viewDate = date;
-    } else {
-      this.viewDate = date;
     }
+    this.viewDate = date;
     this.rangeChanges.next();
-  }
-
-  handleEvent(event: CalendarEventRecord): void {
-    this.participantsController?.abort();
-    const controller = new AbortController();
-    this.participantsController = controller;
-    this.modalEvent = event;
-    this.participants.set([]);
-    this.availablePeople.set([]);
-    this.selectedPersonId = '';
-    this.participantsError.set(null);
-    this.participantsLoading.set(true);
-    this.modal.open(this.modalContent, { size: 'lg' });
-    Promise.all([
-      this.calendarService.getParticipants(event.id, controller.signal),
-      this.calendarService.getPeople(controller.signal),
-    ])
-      .then(([participants, people]) => {
-        if (!controller.signal.aborted) {
-          this.participants.set(participants);
-          this.availablePeople.set(people);
-        }
-      })
-      .catch((error: unknown) => {
-        if (!controller.signal.aborted) {
-          this.participantsError.set(this.toErrorMessage(error));
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          this.participantsLoading.set(false);
-          this.participantsController = null;
-        }
-      });
   }
 
   handleCalendarEvent(event: CalendarEvent): void {
@@ -244,118 +186,43 @@ export class CalendarComponent {
     this.handleEvent(eventRecord);
   }
 
+  handleEvent(event: CalendarEventRecord): void {
+    const modalRef = this.modal.open(CalendarEventParticipantsComponent, { size: 'lg' });
+    modalRef.componentInstance.event = event;
+    modalRef.componentInstance.personId = this.personId();
+    const changedPersonIds = modalRef.componentInstance.changedPersonIds;
+    modalRef.result.then(
+      (result: unknown) => {
+        if (typeof result !== 'object' || result === null) {
+          return;
+        }
+        if ('deletedEventId' in result && result.deletedEventId === event.id) {
+          this.events.update((events) => events.filter(({ id }) => id !== event.id));
+          this.refresh.next();
+        } else if (
+          this.personId() &&
+          changedPersonIds.has(this.personId())
+        ) {
+          this.rangeChanges.next();
+        }
+      },
+      () => {
+        if (this.personId() && changedPersonIds.has(this.personId())) {
+          this.rangeChanges.next();
+        }
+      },
+    );
+  }
+
   loadMore(): void {
     if (!this.loading() && this.hasMore()) {
       this.loadMoreRequests.next();
     }
   }
 
-  async removeParticipant(person: Person): Promise<void> {
-    const event = this.modalEvent;
-    if (!event) {
-      return;
-    }
-
-    this.participantsError.set(null);
-    try {
-      await this.calendarService.removePersonFromEvent(event.id, person.id);
-      this.participants.update((current) => current.filter(({ id }) => id !== person.id));
-      if (this.personId() === person.id) {
-        this.rangeChanges.next();
-      }
-    } catch (error: unknown) {
-      this.participantsError.set(this.toErrorMessage(error));
-    }
-  }
-
-  async addParticipant(): Promise<void> {
-    const event = this.modalEvent;
-    const person = this.availablePeople().find(({ id }) => id === this.selectedPersonId);
-    if (!event || !person) {
-      return;
-    }
-
-    this.participantsError.set(null);
-    try {
-      await this.calendarService.addPersonToEvent(event.id, person.id);
-      this.participants.update((current) =>
-        [...current, person].sort((first, second) => first.name.localeCompare(second.name)),
-      );
-      this.selectedPersonId = '';
-      if (this.personId() === person.id) {
-        this.rangeChanges.next();
-      }
-    } catch (error: unknown) {
-      this.participantsError.set(this.toErrorMessage(error));
-    }
-  }
-
-  openNewEventForm(): void {
-    const startsAt = new Date(this.viewDate);
-    startsAt.setHours(9, 0, 0, 0);
-    const endsAt = new Date(startsAt.getTime() + 60 * 60_000);
-    this.newEventTitle = '';
-    this.newEventStartsAt = this.toDateTimeLocalInput(startsAt);
-    this.newEventEndsAt = this.toDateTimeLocalInput(endsAt);
-    this.creatingEvent.set(true);
-    this.errorMessage.set(null);
-  }
-
-  cancelNewEvent(): void {
+  eventCreated(): void {
     this.creatingEvent.set(false);
-    this.newEventTitle = '';
-    this.newEventStartsAt = '';
-    this.newEventEndsAt = '';
-  }
-
-  async createEvent(): Promise<void> {
-    this.savingEvent.set(true);
-    this.errorMessage.set(null);
-    try {
-      const start = new Date(this.newEventStartsAt);
-      const end = this.newEventEndsAt ? new Date(this.newEventEndsAt) : null;
-      const eventId = await this.calendarService.createEvent({
-        title: this.newEventTitle,
-        starts_at: start.toISOString(),
-        ends_at: end?.toISOString() ?? null,
-      });
-      this.cancelNewEvent();
-      const personId = this.personId();
-      if (personId) {
-        try {
-          await this.calendarService.addPersonToEvent(eventId, personId);
-        } catch (error: unknown) {
-          this.errorMessage.set(
-            `The event was created, but its person link could not be added: ${this.toErrorMessage(error)}`,
-          );
-          this.rangeChanges.next();
-          return;
-        }
-      }
-      this.rangeChanges.next();
-    } catch (error: unknown) {
-      this.errorMessage.set(this.toErrorMessage(error));
-    } finally {
-      this.savingEvent.set(false);
-    }
-  }
-
-  async deleteEvent(): Promise<void> {
-    const event = this.modalEvent;
-    if (!event || !window.confirm(`Delete “${event.title}” and its participant links?`)) {
-      return;
-    }
-
-    this.participantsError.set(null);
-    try {
-      await this.calendarService.deleteEvent(event.id);
-      this.events.update((current) => current.filter(({ id }) => id !== event.id));
-      this.refresh.next();
-      this.modal.dismissAll();
-      this.modalEvent = null;
-    } catch (error: unknown) {
-      this.participantsError.set(this.toErrorMessage(error));
-    }
+    this.rangeChanges.next();
   }
 
   onViewDateChange(): void {
@@ -393,11 +260,6 @@ export class CalendarComponent {
   }
 
   private toErrorMessage(error: unknown): string {
-    return error instanceof Error ? error.message : 'An unexpected calendar error occurred.';
-  }
-
-  private toDateTimeLocalInput(date: Date): string {
-    const pad = (value: number): string => String(value).padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    return this.i18n.translateError(error, 'errors.unexpectedCalendar');
   }
 }

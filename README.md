@@ -9,7 +9,7 @@ does not keep an application-wide copy of people, events, or associations.
 The app uses these tables:
 
 ```text
-people(id uuid, name text, owner_id uuid)
+people(id uuid, name text, owner_id uuid, grade smallint, books text, notes text, small_notes text)
 events(id uuid, title text, starts_at timestamptz, ends_at timestamptz null, owner_id uuid)
 event_people(event_id uuid, person_id uuid, owner_id uuid)
 ```
@@ -27,18 +27,29 @@ not yet been created.
 
 The app includes email/password sign-in and account creation. It restores the
 stored Supabase session on startup and subscribes to auth changes. Only signed-in
-users can see calendar routes. People can be created, renamed, or deleted at
-`/manage/people`; expand a person’s event list there to assign or remove events
-for that person. Events can be created, updated, or deleted at `/manage/events`,
-where participants can also be assigned or removed. The calendar additionally
-supports event creation and participant management; creating an event from a
-person’s calendar links it to that person. Deleting a person or event deletes
-only the account-owned associations through database foreign keys.
+users can see calendar routes. People can be created, edited, or deleted at
+`/manage/people`, including their grade, books, notes, and small notes; expand a
+person’s event list there to assign or remove events for that person. Events can
+be created, updated, or deleted at `/manage/events`,
+where participants can also be assigned or removed. New events can select
+multiple people from the current account's RLS-filtered people list, both in
+event management and the calendar's new-event form. Creating an event from a
+person's calendar includes that person by default. The service creates the
+event, then bulk-inserts its selected links; if link creation fails, it attempts
+to remove the new event and reports if cleanup also fails. Deleting a person or
+event deletes only the account-owned associations through database foreign
+keys.
 
 The date query treats event ranges as half-open (`starts_at < range end` and
 `ends_at > range start`), so events spanning into the visible period are
 included, while an event ending exactly at its start boundary is excluded.
 An event with a null `ends_at` is treated as a point event at `starts_at`.
+
+## Language
+
+The interface supports English and Bulgarian. Use the language selector in the
+main header or sign-in form to switch immediately; dates and calendar headings
+follow the selected language.
 
 ## Configure the browser client
 
@@ -99,6 +110,13 @@ aborts the previous Supabase HTTP request when the person or visible date range
 changes, preventing an old response from replacing the newest view. Event
 queries use the indexes created by the SQL migration. No extra cache or global
 database store is maintained.
+
+Management lists use the same bounded paging: people, events, and a person's
+assigned events load 200 rows at a time, with explicit “Load more” controls.
+Association pickers only include loaded rows until more are requested; they do
+not fetch the full tables behind the scenes. Event/person updates and deletes
+request the affected row back from Supabase so an RLS-filtered or missing row
+is reported instead of being treated as a successful change.
 
 New people and events include the verified signed-in account's `owner_id`;
 the database's owner-only RLS policies still validate it against `auth.uid()`.

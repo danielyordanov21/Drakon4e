@@ -1,29 +1,59 @@
 @if (demoMode) {
   <main class="app-shell">
     <aside class="app-demo-notice" role="status">
-      Demo mode — sample data only; changes are temporary and aren’t saved to Supabase.
+      {{ i18n.t('app.demoNotice') }}
     </aside>
+    <header class="app-header">
+      <nav class="app-navigation" [attr.aria-label]="i18n.t('nav.label')">
+        <app-person-button-component />
+        <a routerLink="/manage/people">{{ i18n.t('nav.managePeople') }}</a>
+        <a routerLink="/manage/events">{{ i18n.t('nav.manageEvents') }}</a>
+        <label class="app-language">
+          <span>{{ i18n.t('nav.language') }}</span>
+          <select [value]="i18n.language()" (change)="setLanguage($event)">
+            <option value="en">English</option>
+            <option value="bg">Български</option>
+          </select>
+        </label>
+      </nav>
+    </header>
     <router-outlet />
   </main>
 } @else if (!auth.ready()) {
-  <main class="app-status" role="status">Connecting to Supabase…</main>
+  <main class="app-status" role="status">{{ i18n.t('app.connecting') }}</main>
 } @else if (auth.initializationError(); as error) {
   <main class="app-status app-status--error" role="alert">
-    <h1>Could not connect to Supabase</h1>
+    <h1>{{ i18n.t('app.connectionErrorTitle') }}</h1>
     <p>{{ error }}</p>
-    <p>Check the project URL, publishable key, and network connection.</p>
+    <p>{{ i18n.t('app.connectionHelp') }}</p>
   </main>
 } @else if (auth.session()) {
   <main class="app-shell">
-    <header class="app-session">
-      <span>
-        Signed in{{ auth.session()?.user?.email ? ' as ' + auth.session()?.user?.email : '' }}
-      </span>
-      <a routerLink="/manage/people">Manage people</a>
-      <a routerLink="/manage/events">Manage events</a>
-      <button type="button" (click)="signOut()" [disabled]="signingOut()">
-        {{ signingOut() ? 'Signing out…' : 'Sign out' }}
-      </button>
+    <header class="app-header">
+      <nav class="app-navigation" [attr.aria-label]="i18n.t('nav.label')">
+        <app-person-button-component />
+        <a routerLink="/manage/people">{{ i18n.t('nav.managePeople') }}</a>
+        <a routerLink="/manage/events">{{ i18n.t('nav.manageEvents') }}</a>
+        <label class="app-language">
+          <span>{{ i18n.t('nav.language') }}</span>
+          <select [value]="i18n.language()" (change)="setLanguage($event)">
+            <option value="en">English</option>
+            <option value="bg">Български</option>
+          </select>
+        </label>
+      </nav>
+      <section class="app-session" [attr.aria-label]="i18n.t('nav.account')">
+        <span>
+          {{
+            auth.session()?.user?.email
+              ? i18n.t('nav.signedInAs', { email: auth.session()?.user?.email ?? '' })
+              : i18n.t('nav.signedIn')
+          }}
+        </span>
+        <button type="button" (click)="signOut()" [disabled]="signingOut()">
+          {{ signingOut() ? i18n.t('nav.signingOut') : i18n.t('nav.signOut') }}
+        </button>
+      </section>
     </header>
     @if (signOutError(); as error) {
       <p class="app-status app-status--error" role="alert">{{ error }}</p>

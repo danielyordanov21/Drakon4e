@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
+import { I18nService } from '../../services/i18n.service';
 
 @Component({
   selector: 'app-authentication-component',
@@ -10,6 +11,7 @@ import { AuthService } from '../../services/auth.service';
 })
 export class AuthenticationComponent {
   private readonly auth = inject(AuthService);
+  readonly i18n = inject(I18nService);
 
   readonly isSignUp = signal(false);
   readonly submitting = signal(false);
@@ -25,6 +27,13 @@ export class AuthenticationComponent {
     this.successMessage.set(null);
   }
 
+  setLanguage(event: Event): void {
+    const language = (event.target as HTMLSelectElement).value;
+    if (language === 'en' || language === 'bg') {
+      void this.i18n.setLanguage(language);
+    }
+  }
+
   async submit(): Promise<void> {
     this.submitting.set(true);
     this.errorMessage.set(null);
@@ -35,7 +44,7 @@ export class AuthenticationComponent {
         const signedIn = await this.auth.signUp(this.email.trim(), this.password);
         if (!signedIn) {
           this.successMessage.set(
-            'If this address can be registered, check your email for a confirmation link. You can also return to sign in.',
+            this.i18n.t('auth.confirmation'),
           );
         }
       } else {
@@ -43,7 +52,7 @@ export class AuthenticationComponent {
       }
     } catch (error: unknown) {
       this.errorMessage.set(
-        error instanceof Error ? error.message : 'Authentication failed. Please try again.',
+        this.i18n.translateError(error, 'auth.failed'),
       );
     } finally {
       this.submitting.set(false);

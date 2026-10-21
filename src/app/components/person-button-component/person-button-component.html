@@ -1,19 +1,30 @@
 <div class="person-picker" (keydown.escape)="closeMenu()">
   <button
+    #trigger
     type="button"
     class="person-picker__trigger"
     [attr.aria-expanded]="isOpen()"
+    aria-haspopup="true"
     aria-controls="person-picker-options"
     (click)="toggleMenu()"
   >
-    Select a person
+    <span class="person-picker__icon" aria-hidden="true">♙</span>
+    <span>{{ i18n.t('nav.choosePerson') }}</span>
     <span class="person-picker__chevron" aria-hidden="true">⌄</span>
   </button>
 
   @if (isOpen()) {
-    <div class="person-picker__dropdown" id="person-picker-options" aria-label="People">
+    <div
+      class="person-picker__dropdown"
+      id="person-picker-options"
+      role="navigation"
+      [attr.aria-label]="i18n.t('picker.people')"
+      [style.top.px]="dropdownPosition().top"
+      [style.left.px]="dropdownPosition().left"
+      [style.max-height.px]="dropdownPosition().maxHeight"
+    >
       @if (loading()) {
-        <p class="person-picker__status" role="status">Loading people…</p>
+        <p class="person-picker__status" role="status">{{ i18n.t('picker.loading') }}</p>
       } @else if (errorMessage(); as error) {
         <p class="person-picker__error" role="alert">{{ error }}</p>
       } @else {
@@ -22,7 +33,7 @@
           routerLink="/"
           (click)="closeMenu()"
         >
-          All people
+          {{ i18n.t('picker.allPeople') }}
         </a>
         @for (person of people(); track person.id) {
           <a
@@ -33,7 +44,17 @@
             {{ person.name }}
           </a>
         } @empty {
-          <p class="person-picker__status">No people found.</p>
+          <p class="person-picker__status">{{ i18n.t('picker.noPeople') }}</p>
+        }
+        @if (hasMore()) {
+          <button
+            type="button"
+            class="person-picker__option person-picker__load-more"
+            (click)="loadMore()"
+            [disabled]="loadingMore()"
+          >
+            {{ loadingMore() ? i18n.t('picker.loadingMore') : i18n.t('picker.loadMore') }}
+          </button>
         }
       }
     </div>

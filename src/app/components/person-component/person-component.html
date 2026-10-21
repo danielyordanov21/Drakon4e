@@ -1,4 +1,13 @@
 <main class="person-page">
-  <h1>Person {{ personId() }}</h1>
+  @if (loading()) {
+    <h1 role="status">{{ i18n.t('person.loading') }}</h1>
+  } @else if (person(); as currentPerson) {
+    <h1>{{ currentPerson.name }}</h1>
+  } @else {
+    <h1>{{ i18n.t('person.notFound') }}</h1>
+    @if (errorMessage(); as error) {
+      <p class="person-page__error" role="alert">{{ error }}</p>
+    }
+  }
   <app-calendar-component [personId]="personId()" />
 </main>

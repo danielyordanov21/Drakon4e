@@ -11,20 +11,26 @@
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  min-height: 42px;
-  padding: 0.55rem 0.85rem;
-  border: 1px solid var(--color-line);
-  border-radius: 10px;
-  background: var(--color-surface);
-  color: var(--color-ink);
+  gap: 0.65rem;
+  min-height: 48px;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--color-brand-dark);
+  border-radius: 12px;
+  background: var(--color-brand);
+  box-shadow: 0 3px 10px rgb(25 45 32 / 16%);
+  color: #fff;
   font: inherit;
-  font-size: 0.85rem;
-  font-weight: 650;
+  font-size: 0.95rem;
+  font-weight: 750;
   white-space: nowrap;
+  cursor: pointer;
 }
 
-.person-picker__trigger:hover,
+.person-picker__trigger:hover {
+  background: var(--color-brand-dark);
+  color: #fff;
+}
+
 .person-picker__option:hover {
   background: #eaf1e9;
   color: var(--color-brand-dark);
@@ -37,22 +43,25 @@
 }
 
 .person-picker__chevron {
-  color: var(--color-brand-dark);
+  color: currentColor;
   font-size: 1.1rem;
   line-height: 0.8;
 }
 
+.person-picker__icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
 .person-picker__dropdown {
-  position: absolute;
-  z-index: 5;
-  top: calc(100% + 0.4rem);
-  right: 0;
+  position: fixed;
+  z-index: 1050;
   display: grid;
   gap: 0.4rem;
-  width: min(18rem, 80vw);
-  max-height: min(24rem, 60vh);
+  width: min(22rem, calc(100vw - 1rem));
   padding: 0.5rem;
   overflow-y: auto;
+  overscroll-behavior: contain;
   border: 1px solid var(--color-line);
   border-radius: 12px;
   background: var(--color-surface);

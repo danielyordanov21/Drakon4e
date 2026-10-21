@@ -38,16 +38,28 @@ export interface Database {
           id: string;
           name: string;
           owner_id: string;
+          grade: number | null;
+          books: string | null;
+          notes: string | null;
+          small_notes: string | null;
         };
         Insert: {
           id?: string;
           name: string;
           owner_id?: string;
+          grade?: number | null;
+          books?: string | null;
+          notes?: string | null;
+          small_notes?: string | null;
         };
         Update: {
           id?: string;
           name?: string;
           owner_id?: string;
+          grade?: number | null;
+          books?: string | null;
+          notes?: string | null;
+          small_notes?: string | null;
         };
         Relationships: [
           {

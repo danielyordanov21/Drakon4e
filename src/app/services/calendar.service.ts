@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { CalendarEvent } from 'angular-calendar';
 import { EventColor } from 'calendar-utils';
 import { Database } from '../models/database.types';
-import { Person } from '../models/person.model';
+import { Person, PersonInput } from '../models/person.model';
 import { SUPABASE_CLIENT } from './supabase-client';
 
 export interface CalendarDateRange {
@@ -12,6 +12,12 @@ export interface CalendarDateRange {
 
 export interface EventPage {
   events: CalendarEventRecord[];
+  hasMore: boolean;
+  nextOffset: number | null;
+}
+
+export interface PeoplePage {
+  people: Person[];
   hasMore: boolean;
   nextOffset: number | null;
 }
@@ -121,21 +127,6 @@ export class CalendarService {
     return this.toPage(data ?? [], limit, offset);
   }
 
-  async getAllEvents(signal?: AbortSignal): Promise<CalendarEventRecord[]> {
-    return this.getAllEventsFromPages((offset) =>
-      this.getEvents({ offset, signal }),
-    );
-  }
-
-  async getAllEventsForPerson(
-    personId: Person['id'],
-    signal?: AbortSignal,
-  ): Promise<CalendarEventRecord[]> {
-    return this.getAllEventsFromPages((offset) =>
-      this.getEventsForPerson(personId, { offset, signal }),
-    );
-  }
-
   async getEventsForPersonInRange(
     personId: Person['id'],
     range: CalendarDateRange,
@@ -191,32 +182,60 @@ export class CalendarService {
     return (data ?? []).map(({ id, name }) => ({ id, name }));
   }
 
-  async getPeople(signal?: AbortSignal): Promise<Person[]> {
+  async getPeople(options: CalendarPageOptions = {}): Promise<PeoplePage> {
+    const { offset, limit } = this.validatePageOptions(options);
     const { data, error } = await (await this.getClient())
       .from('people')
-      .select('id,name')
+      .select('id,name,grade,books,notes,small_notes')
       .order('name')
-      .abortSignal(signal ?? new AbortController().signal);
+      .order('id')
+      .range(offset, offset + limit)
+      .abortSignal(options.signal ?? new AbortController().signal);
 
     if (error) {
       throw new Error(`Could not load people: ${error.message}`, { cause: error });
     }
 
-    return data ?? [];
+    const rows = data ?? [];
+    const hasMore = rows.length > limit;
+    const people = rows.slice(0, limit);
+    return {
+      people,
+      hasMore,
+      nextOffset: hasMore ? offset + people.length : null,
+    };
   }
 
-  async createPerson(name: string): Promise<Person> {
-    const normalizedName = name.trim();
-    if (!normalizedName) {
-      throw new TypeError('Person name must not be empty.');
+  async getPerson(personId: Person['id'], signal?: AbortSignal): Promise<Person> {
+    if (!personId.trim()) {
+      throw new TypeError('Person ID must not be empty.');
     }
+
+    const { data, error } = await (await this.getClient())
+      .from('people')
+      .select('id,name,grade,books,notes,small_notes')
+      .eq('id', personId)
+      .abortSignal(signal ?? new AbortController().signal)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`Could not load person: ${error.message}`, { cause: error });
+    }
+    if (!data) {
+      throw new Error('Could not find this person.');
+    }
+    return data;
+  }
+
+  async createPerson(person: PersonInput): Promise<Person> {
+    const normalizedPerson = this.normalizePersonInput(person);
 
     const client = await this.getClient();
     const ownerId = await this.getAuthenticatedOwnerId(client);
     const { data, error } = await client
       .from('people')
-      .insert({ name: normalizedName, owner_id: ownerId })
-      .select('id,name')
+      .insert({ ...normalizedPerson, owner_id: ownerId })
+      .select('id,name,grade,books,notes,small_notes')
       .single();
 
     if (error) {
@@ -225,19 +244,24 @@ export class CalendarService {
     return data;
   }
 
-  async updatePerson(personId: Person['id'], name: string): Promise<void> {
-    const normalizedName = name.trim();
-    if (!personId.trim() || !normalizedName) {
-      throw new TypeError('Person ID and name must not be empty.');
+  async updatePerson(personId: Person['id'], person: PersonInput): Promise<void> {
+    if (!personId.trim()) {
+      throw new TypeError('Person ID must not be empty.');
     }
+    const normalizedPerson = this.normalizePersonInput(person);
 
-    const { error } = await (await this.getClient())
+    const { data, error } = await (await this.getClient())
       .from('people')
-      .update({ name: normalizedName })
-      .eq('id', personId);
+      .update(normalizedPerson)
+      .eq('id', personId)
+      .select('id')
+      .maybeSingle();
 
     if (error) {
       throw new Error(`Could not update person: ${error.message}`, { cause: error });
+    }
+    if (!data) {
+      throw new Error('Could not update person: no matching person was found.');
     }
   }
 
@@ -246,18 +270,30 @@ export class CalendarService {
       throw new TypeError('Person ID must not be empty.');
     }
 
-    const { error } = await (await this.getClient())
+    const { data, error } = await (await this.getClient())
       .from('people')
       .delete()
-      .eq('id', personId);
+      .eq('id', personId)
+      .select('id')
+      .maybeSingle();
 
     if (error) {
       throw new Error(`Could not delete person: ${error.message}`, { cause: error });
     }
+    if (!data) {
+      throw new Error('Could not delete person: no matching person was found.');
+    }
   }
 
-  async createEvent(event: CalendarEventInput): Promise<string> {
+  async createEvent(
+    event: CalendarEventInput,
+    participantIds: readonly Person['id'][] = [],
+  ): Promise<string> {
     const normalizedEvent = this.validateEventInput(event);
+    const uniqueParticipantIds = [...new Set(participantIds)];
+    if (uniqueParticipantIds.some((personId) => !personId.trim())) {
+      throw new TypeError('Participant IDs must not be empty.');
+    }
     const client = await this.getClient();
     const ownerId = await this.getAuthenticatedOwnerId(client);
     const { data, error } = await client
@@ -269,6 +305,35 @@ export class CalendarService {
     if (error) {
       throw new Error(`Could not create event: ${error.message}`, { cause: error });
     }
+
+    if (uniqueParticipantIds.length > 0) {
+      const { error: linkError } = await client.from('event_people').upsert(
+        uniqueParticipantIds.map((personId) => ({
+          event_id: data.id,
+          person_id: personId,
+          owner_id: ownerId,
+        })),
+        { onConflict: 'event_id,person_id', ignoreDuplicates: true },
+      );
+
+      if (linkError) {
+        try {
+          await this.deleteEvent(data.id);
+        } catch (rollbackError: unknown) {
+          const rollbackMessage =
+            rollbackError instanceof Error ? rollbackError.message : 'Unknown cleanup error.';
+          throw new Error(
+            `Event ${data.id} was created, but participant assignment failed (${linkError.message}) and cleanup failed (${rollbackMessage}).`,
+            { cause: linkError },
+          );
+        }
+        throw new Error(
+          `Could not assign participants; the new event was removed: ${linkError.message}`,
+          { cause: linkError },
+        );
+      }
+    }
+
     return data.id;
   }
 
@@ -277,13 +342,18 @@ export class CalendarService {
       throw new TypeError('Event ID must not be empty.');
     }
     const normalizedEvent = this.validateEventInput(event);
-    const { error } = await (await this.getClient())
+    const { data, error } = await (await this.getClient())
       .from('events')
       .update(normalizedEvent)
-      .eq('id', eventId);
+      .eq('id', eventId)
+      .select('id')
+      .maybeSingle();
 
     if (error) {
       throw new Error(`Could not update event: ${error.message}`, { cause: error });
+    }
+    if (!data) {
+      throw new Error('Could not update event: no matching event was found.');
     }
   }
 
@@ -292,13 +362,18 @@ export class CalendarService {
       throw new TypeError('Event ID must not be empty.');
     }
 
-    const { error } = await (await this.getClient())
+    const { data, error } = await (await this.getClient())
       .from('events')
       .delete()
-      .eq('id', eventId);
+      .eq('id', eventId)
+      .select('id')
+      .maybeSingle();
 
     if (error) {
       throw new Error(`Could not delete event: ${error.message}`, { cause: error });
+    }
+    if (!data) {
+      throw new Error('Could not delete event: no matching event was found.');
     }
   }
 
@@ -322,16 +397,21 @@ export class CalendarService {
   async removePersonFromEvent(eventId: string, personId: Person['id']): Promise<void> {
     this.validateRelationshipIds(eventId, personId);
 
-    const { error } = await (await this.getClient())
+    const { data, error } = await (await this.getClient())
       .from('event_people')
       .delete()
       .eq('event_id', eventId)
-      .eq('person_id', personId);
+      .eq('person_id', personId)
+      .select('event_id')
+      .maybeSingle();
 
     if (error) {
       throw new Error(`Could not remove this person from the event: ${error.message}`, {
         cause: error,
       });
+    }
+    if (!data) {
+      throw new Error('Could not remove this person from the event: no matching link was found.');
     }
   }
 
@@ -365,22 +445,6 @@ export class CalendarService {
     return data.user.id;
   }
 
-  private async getAllEventsFromPages(
-    loadPage: (offset: number) => Promise<EventPage>,
-  ): Promise<CalendarEventRecord[]> {
-    const events: CalendarEventRecord[] = [];
-    let offset = 0;
-
-    while (true) {
-      const page = await loadPage(offset);
-      events.push(...page.events);
-      if (!page.hasMore) {
-        return events;
-      }
-      offset += page.events.length;
-    }
-  }
-
   private toIsoString(date: Date, fieldName: string): string {
     if (Number.isNaN(date.getTime())) {
       throw new TypeError(`${fieldName} must be a valid date.`);
@@ -392,6 +456,32 @@ export class CalendarService {
     if (!eventId.trim() || !personId.trim()) {
       throw new TypeError('eventId and personId must not be empty.');
     }
+  }
+
+  private normalizePersonInput(person: PersonInput): PersonInput {
+    const name = person.name.trim();
+    if (!name) {
+      throw new TypeError('Person name must not be empty.');
+    }
+    if (
+      person.grade !== null &&
+      (!Number.isInteger(person.grade) || person.grade < 0 || person.grade > 12)
+    ) {
+      throw new RangeError('Grade must be a whole number between 0 and 12.');
+    }
+
+    const normalizeText = (value: string | null): string | null => {
+      const normalizedValue = value?.trim() ?? '';
+      return normalizedValue || null;
+    };
+
+    return {
+      name,
+      grade: person.grade,
+      books: normalizeText(person.books),
+      notes: normalizeText(person.notes),
+      small_notes: normalizeText(person.small_notes),
+    };
   }
 
   private validateEventInput(event: CalendarEventInput): CalendarEventInput {

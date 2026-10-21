@@ -16,6 +16,10 @@
   letter-spacing: -0.05em;
 }
 
+.person-page__error {
+  color: #8f332b;
+}
+
 .person-page app-calendar-component {
   padding: clamp(0.75rem, 2vw, 1.75rem);
   border: 1px solid var(--color-line);

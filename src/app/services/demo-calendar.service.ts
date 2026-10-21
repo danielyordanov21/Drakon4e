@@ -7,8 +7,9 @@ import {
   CalendarEventRecord,
   CalendarPageOptions,
   EventPage,
+  PeoplePage,
 } from './calendar.service';
-import { Person } from '../models/person.model';
+import { Person, PersonInput } from '../models/person.model';
 
 interface DemoEvent {
   id: string;
@@ -64,17 +65,6 @@ export class DemoCalendarService {
     );
   }
 
-  async getAllEvents(): Promise<CalendarEventRecord[]> {
-    return this.events
-      .slice()
-      .sort((first, second) => first.startsAt.getTime() - second.startsAt.getTime())
-      .map((event) => this.toCalendarEvent(event));
-  }
-
-  async getAllEventsForPerson(personId: Person['id']): Promise<CalendarEventRecord[]> {
-    return (await this.getEventsForPerson(personId, { limit: 500 })).events;
-  }
-
   async getEventsForPersonInRange(
     personId: Person['id'],
     range: CalendarDateRange,
@@ -94,30 +84,46 @@ export class DemoCalendarService {
     return this.people.filter((person) => participantIds?.has(person.id));
   }
 
-  async getPeople(): Promise<Person[]> {
-    return [...this.people].sort((first, second) => first.name.localeCompare(second.name));
+  async getPeople(options: CalendarPageOptions = {}): Promise<PeoplePage> {
+    const offset = options.offset ?? 0;
+    const limit = options.limit ?? 200;
+    const page = this.people
+      .slice()
+      .sort((first, second) => first.name.localeCompare(second.name))
+      .slice(offset, offset + limit + 1);
+    const hasMore = page.length > limit;
+    const people = page.slice(0, limit);
+    return {
+      people,
+      hasMore,
+      nextOffset: hasMore ? offset + people.length : null,
+    };
   }
 
-  async createPerson(name: string): Promise<Person> {
-    const normalizedName = name.trim();
-    if (!normalizedName) {
-      throw new TypeError('Person name must not be empty.');
+  async getPerson(personId: Person['id']): Promise<Person> {
+    const person = this.people.find(({ id }) => id === personId);
+    if (!person) {
+      throw new Error('Could not find this person.');
     }
-    const person = { id: `demo-person-${this.nextPersonId++}`, name: normalizedName };
+    return { ...person };
+  }
+
+  async createPerson(input: PersonInput): Promise<Person> {
+    const normalizedInput = this.normalizePersonInput(input);
+    const person = { id: `demo-person-${this.nextPersonId++}`, ...normalizedInput };
     this.people.push(person);
     return person;
   }
 
-  async updatePerson(personId: Person['id'], name: string): Promise<void> {
+  async updatePerson(personId: Person['id'], input: PersonInput): Promise<void> {
     const person = this.people.find(({ id }) => id === personId);
-    const normalizedName = name.trim();
-    if (!personId.trim() || !normalizedName) {
-      throw new TypeError('Person ID and name must not be empty.');
+    if (!personId.trim()) {
+      throw new TypeError('Person ID must not be empty.');
     }
     if (!person) {
       throw new Error('Could not find this person.');
     }
-    person.name = normalizedName;
+    Object.assign(person, this.normalizePersonInput(input));
   }
 
   async deletePerson(personId: Person['id']): Promise<void> {
@@ -145,7 +151,10 @@ export class DemoCalendarService {
     this.participants.get(eventId)?.delete(personId);
   }
 
-  async createEvent(event: CalendarEventInput): Promise<string> {
+  async createEvent(
+    event: CalendarEventInput,
+    participantIds: readonly Person['id'][] = [],
+  ): Promise<string> {
     const title = event.title.trim();
     const startsAt = new Date(event.starts_at);
     const endsAt = event.ends_at ? new Date(event.ends_at) : null;
@@ -162,6 +171,18 @@ export class DemoCalendarService {
     const id = `demo-event-${this.nextEventId++}`;
     this.events.push({ id, title, startsAt, endsAt });
     this.participants.set(id, new Set());
+    try {
+      for (const personId of new Set(participantIds)) {
+        await this.addPersonToEvent(id, personId);
+      }
+    } catch (error: unknown) {
+      this.events.splice(
+        this.events.findIndex(({ id: currentId }) => currentId === id),
+        1,
+      );
+      this.participants.delete(id);
+      throw error;
+    }
     return id;
   }
 
@@ -222,6 +243,32 @@ export class DemoCalendarService {
         ? event.endsAt > range.start
         : event.startsAt >= range.start)
     );
+  }
+
+  private normalizePersonInput(input: PersonInput): PersonInput {
+    const name = input.name.trim();
+    if (!name) {
+      throw new TypeError('Person name must not be empty.');
+    }
+    if (
+      input.grade !== null &&
+      (!Number.isInteger(input.grade) || input.grade < 0 || input.grade > 12)
+    ) {
+      throw new RangeError('Grade must be a whole number between 0 and 12.');
+    }
+
+    const normalizeText = (value: string | null): string | null => {
+      const normalizedValue = value?.trim() ?? '';
+      return normalizedValue || null;
+    };
+
+    return {
+      name,
+      grade: input.grade,
+      books: normalizeText(input.books),
+      notes: normalizeText(input.notes),
+      small_notes: normalizeText(input.small_notes),
+    };
   }
 
   private toCalendarEvent(event: DemoEvent): CalendarEventRecord {

@@ -1,0 +1,70 @@
+<form class="event-create-form" (ngSubmit)="save()">
+  <label for="new-event-title">{{ i18n.t('eventForm.title') }}</label>
+  <input
+    id="new-event-title"
+    name="title"
+    type="text"
+    maxlength="200"
+    [(ngModel)]="title"
+    required
+  />
+  <label for="new-event-start">{{ i18n.t('eventForm.starts') }}</label>
+  <input
+    id="new-event-start"
+    name="startsAt"
+    type="datetime-local"
+    [(ngModel)]="startsAt"
+    required
+  />
+  <label for="new-event-end">{{ i18n.t('eventForm.endsOptional') }}</label>
+  <input id="new-event-end" name="endsAt" type="datetime-local" [(ngModel)]="endsAt" />
+
+  <fieldset class="event-participant-picker" [disabled]="saving() || loadingPeople()">
+    <legend>{{ i18n.t('eventForm.participantsOptional') }}</legend>
+    @if (loadingPeople()) {
+      <p role="status">{{ i18n.t('eventForm.loadingPeople') }}</p>
+    } @else {
+      @for (person of people(); track person.id) {
+        <label class="event-participant-picker__person">
+          <input
+            type="checkbox"
+            [name]="'new-event-person-' + person.id"
+            [ngModel]="selectedPersonIds().includes(person.id)"
+            (ngModelChange)="togglePerson(person.id, $event)"
+            [ngModelOptions]="{ standalone: true }"
+          />
+          {{ person.name }}
+        </label>
+      } @empty {
+        <p>{{ i18n.t('eventForm.noPeople') }}</p>
+      }
+      @if (hasMorePeople()) {
+        <button
+          class="calendar-button"
+          type="button"
+          (click)="loadMorePeople()"
+          [disabled]="loadingMorePeople()"
+        >
+          {{ loadingMorePeople() ? i18n.t('eventForm.loadingMore') : i18n.t('eventForm.loadMore') }}
+        </button>
+      }
+    }
+  </fieldset>
+
+  @if (errorMessage(); as error) {
+    <p class="calendar-error" role="alert">{{ error }}</p>
+  }
+
+  <div class="event-create-form__actions">
+    <button
+      class="calendar-button calendar-button--primary"
+      type="submit"
+      [disabled]="saving() || loadingPeople()"
+    >
+      {{ saving() ? i18n.t('eventForm.saving') : i18n.t('eventForm.save') }}
+    </button>
+    <button class="calendar-button" type="button" (click)="cancelled.emit()">
+      {{ i18n.t('eventForm.cancel') }}
+    </button>
+  </div>
+</form>

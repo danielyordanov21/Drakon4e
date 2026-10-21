@@ -1,7 +1,7 @@
-<section class="calendar-view" aria-label="Calendar">
+<section class="calendar-view" [attr.aria-label]="i18n.t('calendar.label')">
   <header class="calendar-toolbar">
     <div class="calendar-navigation">
-      <div class="calendar-month-nav" aria-label="Calendar navigation">
+      <div class="calendar-month-nav" [attr.aria-label]="i18n.t('calendar.navigation')">
         <button
           type="button"
           class="calendar-button calendar-button--icon"
@@ -9,7 +9,7 @@
           [view]="view"
           [(viewDate)]="viewDate"
           (viewDateChange)="onViewDateChange()"
-          aria-label="Previous period"
+          [attr.aria-label]="i18n.t('calendar.previous')"
         >
           <span aria-hidden="true">&lsaquo;</span>
         </button>
@@ -20,7 +20,7 @@
           [(viewDate)]="viewDate"
           (viewDateChange)="onViewDateChange()"
         >
-          Today
+          {{ i18n.t('calendar.today') }}
         </button>
         <button
           type="button"
@@ -29,27 +29,26 @@
           [view]="view"
           [(viewDate)]="viewDate"
           (viewDateChange)="onViewDateChange()"
-          aria-label="Next period"
+          [attr.aria-label]="i18n.t('calendar.next')"
         >
           <span aria-hidden="true">&rsaquo;</span>
         </button>
       </div>
 
       <h3 class="calendar-title">
-        {{ viewDate | calendarDate:(view + 'ViewTitle'):'en' }}
+        {{ viewDate | calendarDate:(view + 'ViewTitle'):i18n.calendarLocale() }}
       </h3>
     </div>
 
     <div class="calendar-toolbar-actions">
-      <app-person-button-component />
       <button
         type="button"
         class="calendar-button calendar-button--primary"
-        (click)="openNewEventForm()"
+        (click)="creatingEvent.set(true)"
       >
-        New event
+        {{ i18n.t('calendar.newEvent') }}
       </button>
-      <div class="calendar-view-switch" aria-label="Calendar view">
+      <div class="calendar-view-switch" [attr.aria-label]="i18n.t('calendar.view')">
         <button
           type="button"
           class="calendar-button"
@@ -57,7 +56,7 @@
           [class.is-active]="view === CalendarView.Month"
           [attr.aria-pressed]="view === CalendarView.Month"
         >
-          Month
+          {{ i18n.t('calendar.month') }}
         </button>
         <button
           type="button"
@@ -66,7 +65,7 @@
           [class.is-active]="view === CalendarView.Week"
           [attr.aria-pressed]="view === CalendarView.Week"
         >
-          Week
+          {{ i18n.t('calendar.week') }}
         </button>
         <button
           type="button"
@@ -75,49 +74,23 @@
           [class.is-active]="view === CalendarView.Day"
           [attr.aria-pressed]="view === CalendarView.Day"
         >
-          Day
+          {{ i18n.t('calendar.day') }}
         </button>
       </div>
     </div>
   </header>
 
   @if (creatingEvent()) {
-    <form class="event-create-form" (ngSubmit)="createEvent()">
-      <label for="new-event-title">Event title</label>
-      <input
-        id="new-event-title"
-        name="title"
-        type="text"
-        maxlength="200"
-        [(ngModel)]="newEventTitle"
-        required
-      />
-      <label for="new-event-start">Starts</label>
-      <input
-        id="new-event-start"
-        name="startsAt"
-        type="datetime-local"
-        [(ngModel)]="newEventStartsAt"
-        required
-      />
-      <label for="new-event-end">Ends (optional)</label>
-      <input
-        id="new-event-end"
-        name="endsAt"
-        type="datetime-local"
-        [(ngModel)]="newEventEndsAt"
-      />
-      <div class="event-create-form__actions">
-        <button class="calendar-button calendar-button--primary" type="submit" [disabled]="savingEvent()">
-          {{ savingEvent() ? 'Saving…' : 'Save event' }}
-        </button>
-        <button class="calendar-button" type="button" (click)="cancelNewEvent()">Cancel</button>
-      </div>
-    </form>
+    <app-calendar-event-form
+      [personId]="personId()"
+      [startDate]="viewDate"
+      (saved)="eventCreated()"
+      (cancelled)="creatingEvent.set(false)"
+    />
   }
 
   @if (loading()) {
-    <p class="calendar-status" role="status">Loading events…</p>
+    <p class="calendar-status" role="status">{{ i18n.t('calendar.loading') }}</p>
   }
   @if (errorMessage(); as error) {
     <p class="calendar-error" role="alert">{{ error }}</p>
@@ -157,8 +130,8 @@
   <section class="events-panel" aria-labelledby="events-heading">
     <header class="events-panel__header">
       <div>
-        <p class="events-panel__eyebrow">Your schedule</p>
-        <h3 id="events-heading">Events</h3>
+        <p class="events-panel__eyebrow">{{ i18n.t('calendar.yourSchedule') }}</p>
+        <h3 id="events-heading">{{ i18n.t('calendar.events') }}</h3>
       </div>
       @if (hasMore()) {
         <button
@@ -167,7 +140,7 @@
           (click)="loadMore()"
           [disabled]="loading()"
         >
-          Load more
+          {{ i18n.t('calendar.loadMore') }}
         </button>
       }
     </header>
@@ -176,9 +149,9 @@
       <table class="events-table">
         <thead>
           <tr>
-            <th scope="col">Event</th>
-            <th scope="col">Starts</th>
-            <th scope="col">Ends</th>
+            <th scope="col">{{ i18n.t('calendar.event') }}</th>
+            <th scope="col">{{ i18n.t('calendar.starts') }}</th>
+            <th scope="col">{{ i18n.t('calendar.ends') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -189,19 +162,19 @@
                   type="button"
                   class="event-details-button"
                   (click)="handleEvent(event)"
-                  [attr.aria-label]="'Show participants for ' + event.title"
+                  [attr.aria-label]="i18n.t('calendar.showParticipants', { event: event.title })"
                 >
                   {{ event.title }}
                 </button>
               </td>
-              <td>{{ event.start | date:'medium' }}</td>
-              <td>{{ event.end ? (event.end | date:'medium') : '—' }}</td>
+              <td>{{ event.start | date:'medium':undefined:i18n.locale() }}</td>
+              <td>{{ event.end ? (event.end | date:'medium':undefined:i18n.locale()) : '—' }}</td>
             </tr>
           } @empty {
             <tr>
               <td class="events-empty" colspan="3">
                 @if (!loading() && !errorMessage()) {
-                  No events in this date range.
+                  {{ i18n.t('calendar.noEvents') }}
                 }
               </td>
             </tr>
@@ -211,68 +184,3 @@
     </div>
   </section>
 </section>
-
-<ng-template #modalContent let-close="close">
-  <div class="modal-header">
-    <h5 class="modal-title">{{ modalEvent?.title }}</h5>
-    <button type="button" class="calendar-button" (click)="close()" aria-label="Close dialog">
-      Close
-    </button>
-  </div>
-  <div class="modal-body">
-    <h6>Participants</h6>
-    @if (participantsLoading()) {
-      <p class="calendar-status" role="status">Loading participants…</p>
-    } @else if (participantsError(); as error) {
-      <p class="calendar-error" role="alert">{{ error }}</p>
-    } @else {
-      <ul class="participant-list">
-        @for (participant of participants(); track participant.id) {
-          <li>
-            <span>{{ participant.name }}</span>
-            <button
-              type="button"
-              class="calendar-button calendar-button--danger"
-              (click)="removeParticipant(participant)"
-            >
-              Remove from event
-            </button>
-          </li>
-        } @empty {
-          <li>No participants.</li>
-        }
-      </ul>
-      @if (peopleToAdd().length > 0) {
-        <form class="participant-add-form" (ngSubmit)="addParticipant()">
-          <label for="add-participant">Add one of your people</label>
-          <select
-            id="add-participant"
-            name="participant"
-            [(ngModel)]="selectedPersonId"
-            required
-          >
-            <option value="" disabled>Select a person</option>
-            @for (person of peopleToAdd(); track person.id) {
-              <option [value]="person.id">{{ person.name }}</option>
-            }
-          </select>
-          <button class="calendar-button calendar-button--primary" type="submit" [disabled]="!selectedPersonId">
-            Add participant
-          </button>
-        </form>
-      }
-    }
-  </div>
-  <div class="modal-footer">
-    <button
-      type="button"
-      class="calendar-button calendar-button--danger"
-      (click)="deleteEvent()"
-    >
-      Delete event
-    </button>
-    <button type="button" class="calendar-button calendar-button--primary" (click)="close()">
-      Done
-    </button>
-  </div>
-</ng-template>

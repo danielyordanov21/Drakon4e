@@ -1,19 +1,19 @@
 <main class="people-management" aria-labelledby="people-heading">
   <header class="people-management__header">
     <div>
-      <p class="people-management__eyebrow">Your account</p>
-      <h1 id="people-heading">Manage people</h1>
-      <p>Add and maintain the people on your calendar. Only you can see these records.</p>
+      <p class="people-management__eyebrow">{{ i18n.t('people.eyebrow') }}</p>
+      <h1 id="people-heading">{{ i18n.t('people.heading') }}</h1>
+      <p>{{ i18n.t('people.intro') }}</p>
     </div>
-    <nav aria-label="Management navigation">
-      <a routerLink="/manage/events">Manage events</a>
-      <a routerLink="/">Back to calendar</a>
+    <nav [attr.aria-label]="i18n.t('events.navigation')">
+      <a routerLink="/manage/events">{{ i18n.t('events.heading') }}</a>
+      <a routerLink="/">{{ i18n.t('events.backToCalendar') }}</a>
     </nav>
   </header>
 
-  <section class="people-card" aria-label="Add or edit a person">
+  <section class="people-card" [attr.aria-label]="i18n.t('people.formLabel')">
     <form (ngSubmit)="savePerson()">
-      <label for="person-name">Name</label>
+      <label for="person-name">{{ i18n.t('people.name') }}</label>
       <input
         id="person-name"
         name="personName"
@@ -23,103 +23,222 @@
         [(ngModel)]="name"
         required
       />
+      <label for="person-grade">{{ i18n.t('people.grade') }}</label>
+      <input
+        id="person-grade"
+        name="personGrade"
+        type="number"
+        min="0"
+        max="12"
+        step="1"
+        aria-describedby="person-grade-hint"
+        [(ngModel)]="grade"
+      />
+      <small id="person-grade-hint">{{ i18n.t('people.gradeHint') }}</small>
+      <label for="person-books">{{ i18n.t('people.books') }}</label>
+      <textarea
+        id="person-books"
+        name="personBooks"
+        #personTextField
+        class="people-textarea"
+        rows="2"
+        [(ngModel)]="books"
+        (input)="resizeTextarea($event)"
+      ></textarea>
+      <label for="person-notes">{{ i18n.t('people.notes') }}</label>
+      <textarea
+        id="person-notes"
+        name="personNotes"
+        #personTextField
+        class="people-textarea"
+        rows="2"
+        [(ngModel)]="notes"
+        (input)="resizeTextarea($event)"
+      ></textarea>
+      <label for="person-small-notes">{{ i18n.t('people.smallNotes') }}</label>
+      <textarea
+        id="person-small-notes"
+        name="personSmallNotes"
+        #personTextField
+        class="people-textarea"
+        rows="2"
+        [(ngModel)]="smallNotes"
+        (input)="resizeTextarea($event)"
+      ></textarea>
       @if (errorMessage(); as error) {
         <p class="people-error" role="alert">{{ error }}</p>
       }
       <div class="people-actions">
         <button class="people-button people-button--primary" type="submit" [disabled]="saving()">
           @if (saving()) {
-            Saving…
+            {{ i18n.t('people.saving') }}
           } @else {
-            {{ editingPersonId() ? 'Save changes' : 'Add person' }}
+            {{ editingPersonId() ? i18n.t('people.saveChanges') : i18n.t('people.addPerson') }}
           }
         </button>
         @if (editingPersonId()) {
-          <button class="people-button" type="button" (click)="cancelEditing()">Cancel</button>
+          <button class="people-button" type="button" (click)="cancelEditing()">
+            {{ i18n.t('people.cancel') }}
+          </button>
         }
       </div>
     </form>
   </section>
 
   <section class="people-card" aria-labelledby="people-list-heading">
-    <h2 id="people-list-heading">Your people</h2>
+    <h2 id="people-list-heading">{{ i18n.t('people.listHeading') }}</h2>
     @if (loading()) {
-      <p role="status">Loading people…</p>
+      <p role="status">{{ i18n.t('people.loadingPeople') }}</p>
     } @else {
       <ul class="people-list">
         @for (person of people(); track person.id) {
           <li>
-            <span>{{ person.name }}</span>
+            <div class="person-summary">
+              <strong>{{ person.name }}</strong>
+              @if (person.grade !== null && person.grade !== undefined) {
+                <span>{{ i18n.t('people.gradeLabel', { grade: person.grade }) }}</span>
+              }
+              @if (person.books) {
+                <span>{{ i18n.t('people.booksLabel', { books: person.books }) }}</span>
+              }
+              @if (person.notes) {
+                <p>{{ person.notes }}</p>
+              }
+              @if (person.small_notes) {
+                <p class="person-summary__small-notes">{{ person.small_notes }}</p>
+              }
+            </div>
             <div class="people-actions">
               <button class="people-button" type="button" (click)="togglePersonEvents(person)">
-                {{ managingEventsPersonId() === person.id ? 'Hide events' : 'Manage events' }}
+                {{
+                  managingEventsPersonId() === person.id
+                    ? i18n.t('people.hideEvents')
+                    : i18n.t('people.manageEvents')
+                }}
               </button>
               <button class="people-button" type="button" (click)="startEditing(person)">
-                Edit
+                {{ i18n.t('people.edit') }}
               </button>
               <button
                 class="people-button people-button--danger"
                 type="button"
                 (click)="deletePerson(person)"
+                [disabled]="deletingPersonId() !== null"
               >
-                Delete
+                {{
+                  deletingPersonId() === person.id
+                    ? i18n.t('people.deleting')
+                    : i18n.t('people.delete')
+                }}
               </button>
             </div>
             @if (managingEventsPersonId() === person.id) {
-              <section class="person-events" [attr.aria-label]="'Events for ' + person.name">
-                <h3>Events for {{ person.name }}</h3>
+              <section
+                class="person-events"
+                [attr.aria-label]="i18n.t('people.eventsFor', { name: person.name })"
+              >
+                <h3>{{ i18n.t('people.eventsFor', { name: person.name }) }}</h3>
                 @if (managingEvents()) {
-                  <p role="status">Loading events…</p>
+                  <p role="status">{{ i18n.t('people.loadingEvents') }}</p>
                 } @else {
                   <ul class="people-list">
                     @for (event of personEvents(); track event.id) {
                       <li>
-                        <span>{{ event.title }} · {{ event.start | date:'medium' }}</span>
+                        <span>
+                          {{ event.title }} · {{ event.start | date:'medium':undefined:i18n.locale() }}
+                        </span>
                         <button
                           class="people-button people-button--danger"
                           type="button"
                           (click)="removeEventFromPerson(person, event)"
+                          [disabled]="changingAssociation()"
                         >
-                          Remove
+                          {{ i18n.t('events.remove') }}
                         </button>
                       </li>
                     } @empty {
-                      <li class="people-empty">No events linked to this person.</li>
+                      <li class="people-empty">{{ i18n.t('people.noEvents') }}</li>
                     }
                   </ul>
                   @if (availableEventsFor(person).length > 0) {
                     <form class="person-events__form" (ngSubmit)="addEventToPerson(person)">
-                      <label [for]="'person-event-' + person.id">Add an existing event</label>
+                      <label [for]="'person-event-' + person.id">
+                        {{ i18n.t('people.addExistingEvent') }}
+                      </label>
                       <select
                         [id]="'person-event-' + person.id"
                         [name]="'personEvent-' + person.id"
                         [(ngModel)]="selectedEventId"
                         required
                       >
-                        <option value="" disabled>Select an event</option>
+                        <option value="" disabled>{{ i18n.t('people.selectEvent') }}</option>
                         @for (event of availableEventsFor(person); track event.id) {
-                          <option [value]="event.id">{{ event.title }} · {{ event.start | date:'medium' }}</option>
+                          <option [value]="event.id">
+                            {{ event.title }} · {{ event.start | date:'medium':undefined:i18n.locale() }}
+                          </option>
                         }
                       </select>
                       <button
                         class="people-button people-button--primary"
                         type="submit"
-                        [disabled]="!selectedEventId"
+                        [disabled]="!selectedEventId || changingAssociation()"
                       >
-                        Add event to person
+                        {{ i18n.t('people.addEventToPerson') }}
                       </button>
                     </form>
                   } @else if (allEvents().length === 0) {
-                    <p class="people-empty">Create an event to link it to this person.</p>
+                    <p class="people-empty">{{ i18n.t('people.createEventHint') }}</p>
+                  }
+                  @if (hasMorePersonEvents()) {
+                    <button
+                      class="people-button"
+                      type="button"
+                      (click)="loadMorePersonEvents(person)"
+                      [disabled]="loadingMorePersonEvents()"
+                    >
+                      {{
+                        loadingMorePersonEvents()
+                          ? i18n.t('people.loadingEvents')
+                          : i18n.t('people.loadMoreAssigned')
+                      }}
+                    </button>
+                  }
+                  @if (hasMoreEvents()) {
+                    <button
+                      class="people-button"
+                      type="button"
+                      (click)="loadMoreEvents()"
+                      [disabled]="loadingMoreEvents()"
+                    >
+                      {{
+                        loadingMoreEvents()
+                          ? i18n.t('people.loadingEvents')
+                          : i18n.t('people.loadMoreEvents')
+                      }}
+                    </button>
                   }
                 }
               </section>
             }
           </li>
         } @empty {
-          <li class="people-empty">No people yet. Add someone above to get started.</li>
+          <li class="people-empty">{{ i18n.t('people.noPeople') }}</li>
         }
       </ul>
+      @if (hasMorePeople()) {
+        <button
+          class="people-button"
+          type="button"
+          (click)="loadMorePeople()"
+          [disabled]="loadingMorePeople()"
+        >
+          {{
+            loadingMorePeople()
+              ? i18n.t('people.loadingPeople')
+              : i18n.t('people.loadMorePeople')
+          }}
+        </button>
+      }
     }
   </section>
 </main>

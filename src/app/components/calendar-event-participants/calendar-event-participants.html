@@ -1,0 +1,89 @@
+<div class="modal-header">
+  <h5 class="modal-title">{{ event.title }}</h5>
+  <button
+    type="button"
+    class="calendar-button"
+    (click)="activeModal.dismiss()"
+    [attr.aria-label]="i18n.t('participants.closeDialog')"
+  >
+    {{ i18n.t('participants.close') }}
+  </button>
+</div>
+<div class="modal-body">
+  <h6>{{ i18n.t('participants.heading') }}</h6>
+  @if (loading()) {
+    <p class="calendar-status" role="status">{{ i18n.t('participants.loading') }}</p>
+  } @else {
+    <ul class="participant-list">
+      @for (participant of participants(); track participant.id) {
+        <li>
+          <span>{{ participant.name }}</span>
+          <button
+            type="button"
+            class="calendar-button calendar-button--danger"
+            (click)="removeParticipant(participant)"
+            [disabled]="changingPersonId() !== null"
+          >
+            {{
+              changingPersonId() === participant.id
+                ? i18n.t('participants.removing')
+                : i18n.t('participants.removeFromEvent')
+            }}
+          </button>
+        </li>
+      } @empty {
+        <li>{{ i18n.t('participants.none') }}</li>
+      }
+    </ul>
+    @if (availablePeople().length > 0) {
+      <form class="participant-add-form" (ngSubmit)="addParticipant()">
+        <label for="add-participant">{{ i18n.t('participants.addOne') }}</label>
+        <select
+          id="add-participant"
+          name="participant"
+          [(ngModel)]="selectedPersonId"
+          [disabled]="changingPersonId() !== null"
+          required
+        >
+          <option value="" disabled>{{ i18n.t('participants.select') }}</option>
+          @for (person of availablePeople(); track person.id) {
+            <option [value]="person.id">{{ person.name }}</option>
+          }
+        </select>
+        <button
+          class="calendar-button calendar-button--primary"
+          type="submit"
+          [disabled]="!selectedPersonId || changingPersonId() !== null"
+        >
+          {{ changingPersonId() ? i18n.t('participants.adding') : i18n.t('participants.add') }}
+        </button>
+      </form>
+    }
+    @if (hasMorePeople()) {
+      <button
+        type="button"
+        class="calendar-button"
+        (click)="loadMorePeople()"
+        [disabled]="loadingMore()"
+      >
+        {{ loadingMore() ? i18n.t('participants.loadingPeople') : i18n.t('participants.loadMore') }}
+      </button>
+    }
+  }
+  @if (errorMessage(); as error) {
+    <p class="calendar-error" role="alert">{{ error }}</p>
+  }
+</div>
+<div class="modal-footer">
+  <button
+    type="button"
+    class="calendar-button calendar-button--danger"
+    (click)="deleteEvent()"
+    [disabled]="deleting()"
+  >
+    {{ deleting() ? i18n.t('participants.deleting') : i18n.t('participants.deleteEvent') }}
+  </button>
+  <button type="button" class="calendar-button calendar-button--primary" (click)="close()">
+    {{ i18n.t('participants.done') }}
+  </button>
+</div>

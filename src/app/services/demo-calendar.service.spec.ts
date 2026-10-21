@@ -45,8 +45,24 @@ describe('DemoCalendarService', () => {
   });
 
   it('returns people in name order', async () => {
-    const people = await service.getPeople();
-    expect(people.map(({ name }) => name)).toEqual(['Alex Morgan', 'Jamie Lee', 'Riley Chen']);
+    const peoplePage = await service.getPeople({ limit: 2 });
+    expect(peoplePage.people.map(({ name }) => name)).toEqual(['Alex Morgan', 'Jamie Lee']);
+    expect(peoplePage.hasMore).toBe(true);
+    const secondPage = await service.getPeople({
+      limit: 2,
+      offset: peoplePage.nextOffset ?? 0,
+    });
+    expect(secondPage.people.map(({ name }) => name)).toEqual(['Riley Chen']);
+  });
+
+  it('gets a person by ID and reports when it does not exist', async () => {
+    await expect(service.getPerson('demo-alex')).resolves.toMatchObject({
+      id: 'demo-alex',
+      name: 'Alex Morgan',
+    });
+    await expect(service.getPerson('missing-person')).rejects.toThrow(
+      'Could not find this person.',
+    );
   });
 
   it('creates and deletes temporary demo events', async () => {
@@ -69,15 +85,56 @@ describe('DemoCalendarService', () => {
     expect(remainingEvents.events.some(({ id }) => id === createdId)).toBe(false);
   });
 
-  it('supports demo person CRUD and event updates', async () => {
-    const person = await service.createPerson(' Taylor Kim ');
-    expect(person.name).toBe('Taylor Kim');
+  it('creates a demo event with selected participants', async () => {
+    const eventId = await service.createEvent(
+      {
+        title: 'Planning with people',
+        starts_at: new Date().toISOString(),
+        ends_at: null,
+      },
+      ['demo-alex', 'demo-riley'],
+    );
 
-    await service.updatePerson(person.id, 'Taylor Updated');
-    expect((await service.getPeople()).some(({ name }) => name === 'Taylor Updated')).toBe(true);
+    expect((await service.getParticipants(eventId)).map(({ id }) => id)).toEqual([
+      'demo-alex',
+      'demo-riley',
+    ]);
+  });
+
+  it('supports demo person CRUD and event updates', async () => {
+    const person = await service.createPerson({
+      name: ' Taylor Kim ',
+      grade: 6,
+      books: ' Book ',
+      notes: ' Notes ',
+      small_notes: '',
+    });
+    expect(person.name).toBe('Taylor Kim');
+    expect(person).toMatchObject({
+      grade: 6,
+      books: 'Book',
+      notes: 'Notes',
+      small_notes: null,
+    });
+
+    await service.updatePerson(person.id, {
+      name: 'Taylor Updated',
+      grade: null,
+      books: null,
+      notes: null,
+      small_notes: 'Updated',
+    });
+    expect((await service.getPeople()).people).toContainEqual({
+      ...person,
+      name: 'Taylor Updated',
+      grade: null,
+      books: null,
+      notes: null,
+      small_notes: 'Updated',
+    });
 
     await service.deletePerson(person.id);
-    expect((await service.getPeople()).some(({ id }) => id === person.id)).toBe(false);
+    expect((await service.getPeople()).people.some(({ id }) => id === person.id)).toBe(false);
 
     await service.updateEvent('demo-event-1', {
       title: 'Updated planning',
@@ -85,7 +142,17 @@ describe('DemoCalendarService', () => {
       ends_at: null,
     });
     expect(
-      (await service.getAllEvents()).find(({ id }) => id === 'demo-event-1')?.title,
+      (await service.getEvents({ limit: 500 })).events.find(({ id }) => id === 'demo-event-1')?.title,
     ).toBe('Updated planning');
+  });
+
+  it('rejects invalid demo person grades', async () => {
+    await expect(service.createPerson({
+      name: 'Invalid Grade',
+      grade: -1,
+      books: null,
+      notes: null,
+      small_notes: null,
+    })).rejects.toThrow('Grade must be a whole number between 0 and 12.');
   });
 });
